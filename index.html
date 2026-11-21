@@ -15,11 +15,11 @@
 <style>
 :root{
   --bg:#f6f5f2; --card:#ffffff; --text:#1d1d1f; --muted:#6e6e73; --line:#e6e4df;
-  --accent:#1f6f5c; --accent-soft:#e3f0ec; --danger:#c0392b; --chip:#efede8;
+  --accent:#1f6f5c; --accent-soft:#e3f0ec; --danger:#c0392b; --chip:#efede8; --pos:#1e8e3e;
 }
 @media (prefers-color-scheme: dark){
   :root{ --bg:#121212; --card:#1c1c1e; --text:#f2f2f2; --muted:#9a9a9f; --line:#2c2c2e;
-    --accent:#4fbf9f; --accent-soft:#1d3530; --danger:#ff6b5b; --chip:#2a2a2c; }
+    --accent:#4fbf9f; --accent-soft:#1d3530; --danger:#ff6b5b; --chip:#2a2a2c; --pos:#5fd38a; }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif;font-size:16px}
@@ -33,7 +33,7 @@ h2{font-size:15px;margin:22px 0 10px;color:var(--muted);font-weight:600;text-tra
 .status.err #stxt{color:var(--danger)}
 .status.err{color:var(--danger)}
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom);z-index:5}
-nav button{flex:1;max-width:190px;background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:12px 4px 14px;cursor:pointer}
+nav button{flex:1;max-width:160px;font-size:12px!important;background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:12px 4px 14px;cursor:pointer}
 nav button.on{color:var(--accent)}
 .amount-row{display:flex;align-items:center;gap:8px}
 .amount{flex:1;font-size:40px;font-weight:700;border:0;background:transparent;color:var(--text);width:100%;outline:none;font-family:inherit}
@@ -100,6 +100,22 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
 @media (min-width:700px){.overlay{align-items:center}.sheet{border-radius:20px}}
 .sheet h3{margin:0 0 6px;font-size:18px}
 .hidden{display:none!important}
+.seg{display:flex;background:var(--chip);border-radius:12px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:15px;font-weight:600;padding:9px;border-radius:10px;cursor:pointer}
+.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg button.on.in{color:var(--pos)}
+.pos{color:var(--pos)}.neg{color:var(--danger)}
+.kpis.two{grid-template-columns:repeat(2,1fr)}
+.kpis div{min-width:0}
+.kpis b{display:block;overflow-wrap:anywhere}
+.tile-big b{font-size:17px}
+.chart .c .bars{display:flex;align-items:flex-end;gap:3px;height:100%;width:100%;justify-content:center}
+.chart .c .stack{display:flex;flex-direction:column;justify-content:flex-end;height:100%;width:62%;max-width:34px}
+.chart .c .stack i{width:100%;max-width:none}
+.chart .c i.inc{width:22%;max-width:12px;background:var(--pos);opacity:.7;border-radius:4px 4px 0 0}
+.duesoon{color:var(--danger);font-weight:600}
+.profit{font-weight:600}
+.secthead{display:flex;justify-content:space-between;align-items:baseline}
 .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 </style>
@@ -110,7 +126,7 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
 
   <!-- ERFASSEN -->
   <section id="v-add">
-    <h1>Neue Ausgabe</h1>
+    <div class="seg" id="mode"><button data-m="out" class="on">Ausgabe</button><button data-m="in" class="in">Einnahme</button></div>
     <div class="quick" id="quick"></div>
     <div class="card">
       <div class="amount-row">
@@ -120,6 +136,7 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
     </div>
     <div class="grid" id="cats"></div>
     <div class="chips" id="subs"></div>
+    <div class="chips hidden" id="srcs"></div>
     <div id="debtpick" class="hidden">
       <label class="l">Welche Schulden?</label>
       <select id="debtsel"></select>
@@ -143,31 +160,59 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
     <h1>Auswertung</h1>
     <div class="monthnav"><button id="mprev">‹</button><b id="mlabel"></b><button id="mnext">›</button></div>
     <div class="card">
-      <div class="sub">Gesamt im Monat</div>
-      <div class="big" id="mtotal"></div>
+      <div class="kpis tile-big" style="margin-top:0">
+        <div><small>Einnahmen</small><b id="kin" class="pos"></b></div>
+        <div><small>Ausgaben</small><b id="mtotal"></b></div>
+        <div><small>Übrig</small><b id="kleft"></b></div>
+      </div>
       <div class="kpis">
         <div><small>Variabel</small><b id="kvar"></b></div>
         <div><small>Fixkosten</small><b id="kfix"></b></div>
         <div><small>Essen &amp; Trinken</small><b id="kfood"></b></div>
       </div>
-      <div class="sub" id="kcompare" style="margin-top:10px"></div>
+      <div class="sub" id="kday" style="margin-top:10px"></div>
+      <div class="sub" id="kcompare" style="margin-top:6px"></div>
     </div>
     <div class="card">
       <div class="sub">Letzte 6 Monate</div>
       <div class="chart" id="chart"></div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>Variabel</span><span><i style="background:var(--muted);opacity:.5"></i>Fixkosten</span></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Variabel</span><span><i style="background:var(--muted);opacity:.5"></i>Fixkosten</span><span><i style="background:var(--pos);opacity:.7"></i>Einnahmen</span></div>
     </div>
-    <h2>Nach Kategorie</h2>
+    <h2>Ausgaben nach Kategorie</h2>
     <div class="card" id="bycat"></div>
+    <h2>Einnahmen</h2>
+    <div class="card" id="byinc"></div>
     <button class="btn sec" id="export">Alle Daten als CSV kopieren</button>
   </section>
 
-  <!-- FIX & SCHULDEN -->
+  <!-- HANDEL -->
+  <section id="v-trade" class="hidden">
+    <h1>Handel</h1>
+    <div class="card">
+      <div class="kpis" style="margin-top:0">
+        <div><small>Gewinn gesamt</small><b id="tsum"></b></div>
+        <div><small>Gewinn im Monat</small><b id="tmonth"></b></div>
+        <div><small>Im Lager</small><b id="tstock"></b></div>
+      </div>
+    </div>
+    <button class="btn" id="addtrade">Ankauf erfassen</button>
+    <h2>Im Lager</h2>
+    <div id="tradesopen"></div>
+    <h2>Verkauft</h2>
+    <div id="tradesdone"></div>
+  </section>
+
+  <!-- FINANZEN -->
   <section id="v-fix" class="hidden">
-    <h1>Fixkosten &amp; Schulden</h1>
-    <h2>Schulden</h2>
+    <h1>Finanzen</h1>
+    <h2>Kontostand</h2>
+    <div id="balance"></div>
+    <div class="secthead"><h2>Schulden</h2><span class="sub" id="debtsum"></span></div>
     <div id="debts"></div>
     <button class="btn sec" id="adddebt">Schulden hinzufügen</button>
+    <h2>Feste Einnahmen</h2>
+    <div id="fixedin"></div>
+    <button class="btn sec" id="addfixin">Feste Einnahme hinzufügen</button>
     <h2>Monatliche Fixkosten</h2>
     <div class="sub" style="margin:-4px 4px 10px">Werden jeden Monat automatisch mitgezählt, du musst sie nicht eintragen.</div>
     <div id="fixed"></div>
@@ -179,7 +224,8 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
   <button data-v="add" class="on">Erfassen</button>
   <button data-v="list">Verlauf</button>
   <button data-v="stats">Auswertung</button>
-  <button data-v="fix">Fix &amp; Schulden</button>
+  <button data-v="trade">Handel</button>
+  <button data-v="fix">Finanzen</button>
 </nav>
 
 <div class="overlay" id="ov"><div class="sheet" id="sheet"></div></div>
