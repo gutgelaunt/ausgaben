@@ -56,7 +56,7 @@ function rebuild(){
   TRADES = live(S.trades).sort((a,b)=>String(b.sellDate||b.buyDate).localeCompare(String(a.sellDate||a.buyDate)));
   const bl = live(S.balances).sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.updatedAt||0)-(a.updatedAt||0));
   BAL = bl[0]||null;
-  const seen={}; BALS=[]; bl.forEach(b=>{ const k=b.account||'Konto'; if(!seen[k]){ seen[k]=1; BALS.push({...b,account:k}); } });
+  const seen={}; BALS=[]; bl.forEach(b=>{ if(!b.date) return; const k=b.account||'Konto'; if(!seen[k]){ seen[k]=1; BALS.push({...b,account:k}); } });
   SIM = {}; DEBTS.forEach(d=>SIM[d.id]=debtSim(d));
 }
 function put(table, rec){
@@ -142,10 +142,20 @@ let statMonth = ym(today());
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.v));
 function show(v){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  ['add','list','stats','trade','fix'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+  ['home','add','list','stats','fix'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
   window.scrollTo(0,0);
   render();
 }
+let finTab='acc';
+function showFin(f){
+  finTab=f;
+  document.querySelectorAll('#finseg button').forEach(b=>b.classList.toggle('on',b.dataset.f===f));
+  $('#f-acc').classList.toggle('hidden',f!=='acc'); $('#f-fix').classList.toggle('hidden',f!=='fix');
+  $('#f-debt').classList.toggle('hidden',f!=='debt'); $('#v-trade').classList.toggle('hidden',f!=='trade');
+  render();
+}
+document.querySelectorAll('#finseg button').forEach(b=>b.onclick=()=>showFin(b.dataset.f));
+const goFin = f => { show('fix'); showFin(f); };
 
 /* ---------- Erfassen ---------- */
 $('#date').value = today();
@@ -431,7 +441,7 @@ function bookingsBetween(from, to){ // from exklusiv, to exklusiv
   return items.sort((a,b)=>a.date.localeCompare(b.date));
 }
 function renderFree(show){
-  const el=$('#free'); if(!show){ el.classList.add('hidden'); return; } el.classList.remove('hidden');
+  const el=$('#free'); if(!el) return; if(!show){ el.classList.add('hidden'); return; } el.classList.remove('hidden');
   const t=today(), pd=nextPayday();
   const days=Math.max(1,Math.round((new Date(pd.date+'T12:00')-new Date(t+'T12:00'))/864e5));
   const lbl = pd.name ? `bis ${esc(pd.name)} am ${dDE(pd.date).slice(0,6)}` : 'bis Monatsende';
@@ -450,23 +460,72 @@ function renderFree(show){
     <div class="sub" style="margin-top:8px;font-size:13px">Gerechnet mit deinen Kontoständen inkl. allem, was du seitdem erfasst hast, plus festen Buchungen mit Tag und fälligen Schulden. Was du ab heute ausgibst, ist hier noch nicht abgezogen.</div>`;
   if($('#freetoggle')) $('#freetoggle').onclick=()=>$('#freelist').classList.toggle('hidden');
 }
+function warnings(){
+  const t=today(), w=[];
+  DEBTS.forEach(d=>{ if(SIM[d.id].remaining>0.005 && !d.due && !(+d.rate && d.day)) w.push({txt:`${d.name}: kein Fälligkeitsdatum und keine Rate, wird nicht eingeplant`, fn:()=>editDebt(d.id)}); });
+  [...FIXIN,...FIX].forEach(f=>{ if(f.active!==false && !f.day && fixActive(f,ym(t))) w.push({txt:`${f.name}: ohne Tag, wird nicht vom Konto abgezogen`, fn:()=>editFixed(f.id,f.kind==='income'?'income':'expense')}); });
+  BALS.forEach(b=>{ const n=Math.round((new Date(t+'T12:00')-new Date(b.date+'T12:00'))/864e5); if(n>14) w.push({txt:`${b.account}: seit ${n} Tagen nicht abgeglichen`, fn:()=>editBalance(b.account)}); });
+  BALS.filter(b=>b.date===t).forEach(b=>[...FIX,...FIXIN].forEach(f=>{ if(f.day && (f.account||'')===b.account && fixActive(f,ym(t)) && bookDate(f,ym(t))===t) w.push({txt:`${f.name} ist heute fällig und gilt als schon im Kontostand ${b.account} enthalten`, fn:()=>editFixed(f.id,f.kind==='income'?'income':'expense')}); }));
+  return w;
+}
+function renderHome(){
+  const t=today(), pd=nextPayday();
+  const days=Math.max(1,Math.round((new Date(pd.date+'T12:00')-new Date(t+'T12:00'))/864e5));
+  const lbl = pd.name ? `Frei bis ${esc(pd.name)} am ${dDE(pd.date).slice(0,6)}` : 'Frei bis Monatsende';
+  const rows=balRows(t), now=rows.reduce((a,r)=>a+r.est,0);
+  const items=bookingsBetween(t, pd.date);
+  const inSum=items.filter(x=>x.amount>0).reduce((a,x)=>a+x.amount,0), outSum=items.filter(x=>x.amount<0).reduce((a,x)=>a+x.amount,0);
+  const free=now+inSum+outSum;
+  let html = BALS.length ? `<div class="card hero" id="h-hero">
+      <div class="lbl">${lbl}</div>
+      <div class="amt ${free>=0?'':'neg'}">${fmt(free)}</div>
+      <div class="per">${free>=0?`<b>${fmt(free/days)}</b> pro Tag`:'fehlt bis dahin'} <span class="muted">· noch ${days} Tage</span></div>
+      <div class="split"><div><small>Jetzt auf Konten</small><b>${fmt(now)}</b></div><div><small>Kommt noch rein</small><b class="pos">+${fmt(inSum)}</b></div><div><small>Geht noch raus</small><b>${outSum?'−'+fmt(-outSum):fmt(0)}</b></div></div>
+      ${items.length?'<button class="link" id="h-items">Alle Buchungen bis dahin</button>':''}
+    </div>`
+    : `<div class="card hero"><div class="lbl">${lbl}</div><div class="sub" style="margin-top:8px">Trag deine Kontostände und dein Bargeld ein, dann siehst du hier, was wirklich frei ist.</div><button class="btn" id="h-firstbal">Kontostand eintragen</button></div>`;
+  if(rows.length){
+    html += `<h2>Konten</h2><div class="card" style="padding:0 16px">${rows.map(r=>`<div class="catline chev" data-acc="${esc(r.account)}"><div class="h"><span>${esc(r.account)}</span><b class="${r.est<0?'neg':''}">${fmt(r.est)}</b></div></div>`).join('')}
+      ${rows.length>1?`<div class="catline"><div class="h"><span class="muted">Gesamt</span><b style="font-weight:600">${fmt(now)}</b></div></div>`:''}</div>
+      <button class="btn sec" id="h-abgleich">Kontostand abgleichen</button>`;
+  }
+  const next=bookingsBetween(t, addDays(t,45)).slice(0,5);
+  if(next.length) html += `<h2>Nächste Buchungen</h2><div class="card" style="padding:0 16px">${next.map(u=>`<div class="catline"><div class="h"><span><span class="muted" style="width:46px;flex:none">${dDE(u.date).slice(0,6)}</span><span class="nm">${esc(u.name)}</span></span><b class="${u.amount>=0?'pos':''}">${u.amount>=0?'+':'−'}${fmt(Math.abs(u.amount))}</b></div></div>`).join('')}</div>`;
+  const w=warnings();
+  if(w.length) html += `<h2>Hinweise</h2><div class="card" style="padding:0 16px">${w.map((x,i)=>`<div class="catline warn chev" data-w="${i}"><div class="h"><span>${esc(x.txt)}</span><b></b></div></div>`).join('')}</div>`;
+  const md=monthData(ym(t));
+  html += `<h2>${mLabel(ym(t),true)}</h2><div class="card" style="padding:0 16px" id="h-month">
+    <div class="catline chev"><div class="h"><span>Einnahmen</span><b class="pos">${fmt(md.inc)}</b></div></div>
+    <div class="catline chev"><div class="h"><span>Ausgaben</span><b>${fmt(md.total)}</b></div></div>
+    <div class="catline chev"><div class="h"><span>Bilanz Monat</span><b class="${md.left>=0?'pos':'neg'}">${fmt(md.left)}</b></div></div></div>`;
+  $('#home').innerHTML=html;
+  if($('#h-items')) $('#h-items').onclick=()=>{ let run=now;
+    $('#sheet').innerHTML=`<h3>${lbl}</h3><div class="sub">Startet mit ${fmt(now)} auf allen Konten</div><div class="card" style="padding:0 16px;margin-top:14px">${items.map(x=>{ run+=x.amount; return `<div class="catline"><div class="h"><span><span class="muted" style="width:46px;flex:none">${dDE(x.date).slice(0,6)}</span><span class="nm">${esc(x.name)}</span></span><b class="${x.amount>=0?'pos':''}">${x.amount>=0?'+':'−'}${fmt(Math.abs(x.amount))}</b></div><div class="sub" style="font-size:13px;text-align:right">danach ${fmt(run)}</div></div>`; }).join('')}</div>
+      <div class="sub" style="margin:10px 4px 0;font-size:13px">Was du ab heute zusätzlich ausgibst, ist hier noch nicht abgezogen.</div><button class="btn sec" id="x-close">Fertig</button>`;
+    $('#x-close').onclick=closeSheet; openSheet(); };
+  if($('#h-firstbal')) $('#h-firstbal').onclick=()=>editBalance();
+  if($('#h-abgleich')) $('#h-abgleich').onclick=()=>editBalance(rows[0]?.account);
+  document.querySelectorAll('#home .catline[data-acc]').forEach(el=>el.onclick=()=>editBalance(el.dataset.acc));
+  document.querySelectorAll('#home .catline[data-w]').forEach(el=>el.onclick=()=>w[+el.dataset.w].fn());
+  document.querySelectorAll('#h-month .catline').forEach(el=>el.onclick=()=>{ statMonth=ym(t); show('stats'); });
+}
 function renderFix(){
   const t=today();
   const rows = balRows(t);
   const totalEst = rows.reduce((a,r)=>a+r.est,0);
-  $('#balance').innerHTML = `<div class="card" style="padding:6px 16px">${rows.length ? rows.map(r=>`<div class="catline" data-acc="${esc(r.account)}"><div class="h"><span>${esc(r.account)}</span><b>${fmt(r.est)}</b></div>
+  $('#balance').innerHTML = `<div class="card" style="padding:6px 16px">${rows.length ? rows.map(r=>`<div class="catline chev" data-acc="${esc(r.account)}"><div class="h"><span>${esc(r.account)}</span><b>${fmt(r.est)}</b></div>
       <div class="sub" style="font-size:13px">Eingetragen am ${dDE(r.date)}: ${fmt(r.amount)}${r.mv.parts.length?' · seitdem '+r.mv.parts.map(([l,v])=>`${l} <span class="${v>=0?'pos':'neg'}">${v>=0?'+':'−'}${fmt(Math.abs(v))}</span>`).join(', '):''}</div></div>`).join('')
       + (rows.length>1?`<div class="catline"><div class="h"><span class="muted">Gesamt</span><b>${fmt(totalEst)}</b></div></div>`:'')
       : '<div class="empty" style="padding:12px">Noch kein Kontostand eingetragen.</div>'}</div>
-    <button class="btn sec" id="newbal">Kontostand oder Bargeld eintragen</button>`;
+    <button class="btn sec" id="newbal">Kontostand abgleichen oder neues Konto</button>`;
   $('#newbal').onclick=()=>editBalance();
   document.querySelectorAll('#balance .catline[data-acc]').forEach(el=>el.onclick=()=>editBalance(el.dataset.acc));
-  const up = upcoming(6);
+  const up = bookingsBetween(t, addDays(t,45)).slice(0,8);
   $('#upcoming').innerHTML = up.length ? `<div class="card" style="padding:6px 16px">${up.map(u=>`<div class="catline"><div class="h"><span>${dDE(u.date).slice(0,6)} ${esc(u.name)}${u.acc?` <small class="muted">${esc(u.acc)}</small>`:''}</span><b class="${u.amount>=0?'pos':''}">${u.amount>=0?'+':''}${fmt(u.amount)}</b></div></div>`).join('')}</div>` : '<div class="empty" style="padding:12px">Trag bei Fixkosten und festen Einnahmen einen Tag ein, dann siehst du hier die nächsten Buchungen.</div>';
   const totalOpen = DEBTS.reduce((a,d)=>a+SIM[d.id].remaining,0);
   $('#debtsum').textContent = DEBTS.length ? 'offen gesamt '+fmt(totalOpen) : '';
   const soon = addDays(today(),14);
-  $('#debts').innerHTML = DEBTS.length ? DEBTS.map(d=>{ const s=SIM[d.id]; const base=s.total+s.borrowed+s.interest; const pct=base?Math.min(100,s.paid/base*100):0;
+  $('#debts').innerHTML = DEBTS.length ? DEBTS.filter(d=>SIM[d.id].remaining>0.005).concat(DEBTS.filter(d=>SIM[d.id].remaining<=0.005)).map(d=>{ const s=SIM[d.id]; const base=s.total+s.borrowed+s.interest; const pct=base?Math.min(100,s.paid/base*100):0;
     const end = s.monthsLeft ? mLabel(addM(ym(today()),s.monthsLeft),true) : null;
     const open = s.remaining>0.005;
     const dueTxt = d.due && open ? `<span class="${d.due<=soon?'duesoon':''}">fällig ${dDE(d.due)}</span>` : '';
@@ -494,18 +553,40 @@ const wireAccount = id => { $('#'+id).onchange=()=>{ $('#'+id+'-new').classList.
 const readAccount = id => $('#'+id).value==='__new' ? ($('#'+id+'-new').value.trim()||'Konto') : $('#'+id).value;
 
 function editBalance(acc){
-  const hist = acc ? live(S.balances).filter(b=>(b.account||'Konto')===acc).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5) : [];
-  $('#sheet').innerHTML=`<h3>Kontostand oder Bargeld eintragen</h3>
+  const curFor = (ac, date) => { const b=BALS.find(x=>x.account===ac); if(!b || date<b.date) return null; return {b, est:(+b.amount||0)+movements(b,date).total}; };
+  $('#sheet').innerHTML=`<h3>Kontostand abgleichen</h3>
+    <div class="sub">Schau in deine Banking-App und trag den echten Stand ein. Ab hier rechnet die App weiter.</div>
     ${accountField('b-acc', acc||DEFAULT_ACCOUNTS[0])}
-    <label class="l">Aktueller Kontostand (€)</label><input type="text" id="b-amt" inputmode="decimal" placeholder="z. B. 1234,56">
+    <div id="b-cur" class="diff hidden"></div>
+    <label class="l">Echter Stand laut Bank (€)</label><input type="text" id="b-amt" inputmode="decimal" placeholder="z. B. 1234,56">
     <label class="l">Stand vom</label><input type="date" id="b-date" value="${today()}">
-    <div class="sub" style="margin-top:10px">Ab diesem Stand rechnet die App automatisch weiter: Ausgaben und Einnahmen, die du mit diesem Konto erfasst, Umbuchungen und feste Buchungen mit Tag.</div>
-    ${hist.length?`<div class="sub" style="margin-top:10px">Letzte Stände: ${hist.map(h=>dDE(h.date)+' '+fmt(h.amount)).join(' · ')}</div>`:''}
-    <button class="btn" id="b-save">Speichern</button>${delRow(false)}`;
+    <div id="b-diff" class="diff hidden"></div>
+    <button class="btn hidden" id="b-book"></button>
+    <button class="btn" id="b-save">Stand übernehmen</button>${delRow(false)}`;
   wireAccount('b-acc');
+  const upd = () => {
+    const ac=readAccount('b-acc'), date=$('#b-date').value||today(), cur=curFor(ac,date), a=parseAmt($('#b-amt').value);
+    $('#b-cur').classList.toggle('hidden',!cur);
+    if(cur) $('#b-cur').innerHTML=`App rechnet: <b>${fmt(cur.est)}</b><div class="sub" style="font-size:13px">zuletzt eingetragen am ${dDE(cur.b.date)}: ${fmt(cur.b.amount)}</div>`;
+    const diff = cur && isFinite(a) ? Math.round((a-cur.est)*100)/100 : 0;
+    $('#b-diff').classList.toggle('hidden',!diff); $('#b-book').classList.toggle('hidden',!diff);
+    $('#b-save').classList.toggle('sec',!!diff);
+    if(diff){
+      $('#b-diff').innerHTML = diff<0 ? `Differenz: <b class="neg">−${fmt(-diff)}</b><div class="sub" style="font-size:13px">Du hast weniger als berechnet, vermutlich nicht erfasste Ausgaben.</div>`
+                                      : `Differenz: <b class="pos">+${fmt(diff)}</b><div class="sub" style="font-size:13px">Du hast mehr als berechnet, vermutlich nicht erfasste Einnahmen.</div>`;
+      $('#b-book').textContent = diff<0 ? `${fmt(-diff)} als Ausgabe buchen und übernehmen` : `${fmt(diff)} als Einnahme buchen und übernehmen`;
+      $('#b-save').textContent='Nur Stand übernehmen';
+    } else $('#b-save').textContent='Stand übernehmen';
+    return {ac,date,a,diff};
+  };
+  ['b-amt','b-date'].forEach(k=>$('#'+k).addEventListener('input',upd)); $('#b-acc').addEventListener('change',upd); upd();
   $('#x-cancel').onclick=closeSheet;
-  $('#b-save').onclick=()=>{ const a=parseAmt($('#b-amt').value); if(!isFinite(a)) return toast('Betrag prüfen');
-    put('balances',{id:uid(), amount:a, date:$('#b-date').value||today(), note:'', account:readAccount('b-acc')}); closeSheet(); toast('Gespeichert'); };
+  const saveBal = ({ac,date,a}) => put('balances',{id:uid(), amount:a, date, note:'', account:ac});
+  $('#b-save').onclick=()=>{ const v=upd(); if(!isFinite(v.a)) return toast('Betrag prüfen'); saveBal(v); closeSheet(); toast('Gespeichert'); };
+  $('#b-book').onclick=()=>{ const v=upd(); if(!isFinite(v.a)||!v.diff) return;
+    if(v.diff<0) put('expenses',{id:uid(), amount:-v.diff, cat:'sonstiges', sub:'', note:'Nicht erfasst (Abgleich)', date:v.date, debtId:'', account:v.ac});
+    else put('income',{id:uid(), amount:v.diff, source:'Sonstiges', note:'Nicht erfasst (Abgleich)', date:v.date, account:v.ac});
+    saveBal(v); closeSheet(); toast('Gebucht und gespeichert'); };
   openSheet(); $('#b-amt').focus();
 }
 
@@ -541,13 +622,18 @@ function editDebt(id){
   const d = id ? {...S.debts[id]} : {id:uid(),name:'',total:'',rate:'',start:ym(today()),interest:'',due:'',note:'',rateStart:'',day:'',account:''};
   const s = id ? SIM[id] : null;
   $('#sheet').innerHTML=`<h3>${id?esc(d.name):'Neue Schulden'}</h3>
-    ${s?`<div class="sub">Offen: <b>${fmt(s.remaining)}</b> · Start ${fmt(s.total)}${s.borrowed?' + neu geliehen '+fmt(s.borrowed):''}${s.interest?' + Zinsen '+fmt(s.interest):''} − getilgt ${fmt(s.paid)}</div>
-    <div class="row" style="align-items:flex-end"><div><label class="l">Betrag (€)</label><input type="text" id="d-pay" inputmode="decimal" placeholder="z. B. 100"></div>
-    <div><label class="l">Datum</label><input type="date" id="d-pdate" value="${today()}"></div></div>
+    ${s?`<div class="card" style="margin-top:10px"><div class="sub" style="font-size:13px">Offen heute</div><div style="font-size:34px;font-weight:700;font-variant-numeric:tabular-nums" class="${s.remaining>0.005?'neg':''}">${fmt(s.remaining)}</div>
+      <div class="sub" style="font-size:13px">Start ${fmt(s.total)}${s.borrowed?' + neu geliehen '+fmt(s.borrowed):''}${s.interest?' + Zinsen '+fmt(s.interest):''} − getilgt ${fmt(s.paid)}</div></div>
+    <h2>Zahlung erfassen</h2>
+    <div class="row"><div><label class="l" style="margin-top:0">Betrag (€)</label><input type="text" id="d-pay" inputmode="decimal" placeholder="z. B. 100"></div>
+    <div><label class="l" style="margin-top:0">Datum</label><input type="date" id="d-pdate" value="${today()}"></div></div>
     ${accountField('d-pacc', S.prefs.accOut||'Alltagskonto')}
-    <div class="row"><button class="btn small" id="d-paybtn">Zurückgezahlt</button><button class="btn sec small" id="d-borrowbtn">Neu geliehen</button></div>
-    <button class="btn sec small" id="d-histbtn" style="margin-top:8px">Verlauf Monat für Monat</button>
-    <div id="d-hist" class="hidden" style="margin-top:8px"></div>`:''}
+    <div class="row"><button class="btn" id="d-paybtn">Zurückgezahlt</button><button class="btn sec" id="d-borrowbtn">Neu geliehen</button></div>
+    <button class="btn sec" id="d-histbtn">Verlauf Monat für Monat</button>
+    <div id="d-hist" class="hidden" style="margin-top:10px"></div>
+    <button class="btn sec" id="d-editbtn">Einstellungen bearbeiten</button>`:''}
+    <div id="d-settings" class="${s?'hidden':''}">
+    ${s?'<h2>Einstellungen</h2>':''}
     <label class="l">Bezeichnung</label><input type="text" id="d-name" value="${esc(d.name)}" placeholder="z. B. Sebastian, PayPal, Krankenkasse">
     <div class="row"><div><label class="l">Offener Betrag zum Start (€)</label><input type="text" id="d-total" inputmode="decimal" value="${esc(numIn(d.total))}"></div>
     <div><label class="l">Stand vom (Monat)</label><input type="month" id="d-start" value="${esc(d.start||'')}"></div></div>
@@ -558,10 +644,14 @@ function editDebt(id){
     <div class="row"><div><label class="l">Ab Monat</label><input type="month" id="d-rs" value="${esc(d.rateStart||addM(ym(today()),1))}"></div><div>${accountField('d-acc', d.account||DEFAULT_ACCOUNTS[0])}</div></div>
     <label class="l">Fällig bis (optional)</label><input type="date" id="d-due" value="${esc(d.due||'')}">
     <label class="l">Notiz</label><input type="text" id="d-note" value="${esc(d.note||'')}">
-    <div class="sub" style="margin-top:10px">Die Rate wird ab dem gewählten Monat jeden Monat am Tag X vom Konto abgezogen, senkt die Schulden und zählt bei „Frei bis Gehalt“ mit. Einzelne Sonderzahlungen trägst du oben bei „Rückzahlung erfassen“ ein.</div>
-    <button class="btn" id="d-save">Speichern</button>${delRow(!!id)}`;
+    <div class="sub" style="margin-top:10px">Die Rate wird ab dem gewählten Monat jeden Monat am Tag X vom Konto abgezogen, senkt die Schulden und zählt bei „Frei bis Gehalt“ mit. Einzelne Sonderzahlungen trägst du oben bei „Zahlung erfassen“ ein.</div>
+    <button class="btn" id="d-save">Speichern</button>${delRow(!!id)}
+    </div>
+    ${s?'<button class="btn sec" id="d-close">Fertig</button>':''}`;
   wireAccount('d-acc');
   wireSheet('debts',id);
+  if($('#d-close')) $('#d-close').onclick=closeSheet;
+  if($('#d-editbtn')) $('#d-editbtn').onclick=()=>{ $('#d-settings').classList.remove('hidden'); $('#d-editbtn').classList.add('hidden'); $('#d-close').classList.add('hidden'); $('#d-name').scrollIntoView({behavior:'smooth',block:'center'}); };
   if(s){
     wireAccount('d-pacc');
     $('#d-paybtn').onclick=()=>{ const a=parseAmt($('#d-pay').value); if(!(a>0)) return toast('Betrag prüfen');
@@ -713,6 +803,7 @@ $('#ov').addEventListener('click',e=>{ if(e.target.id==='ov') closeSheet(); });
 /* ---------- Render & Start ---------- */
 function render(){
   renderCats(); renderQuick();
+  if(!$('#v-home').classList.contains('hidden')) renderHome();
   if(!$('#v-list').classList.contains('hidden')) renderList();
   if(!$('#v-stats').classList.contains('hidden')) renderStats();
   if(!$('#v-trade').classList.contains('hidden')) renderTrades();

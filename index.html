@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ausgaben</title>
-<meta name="theme-color" content="#1f6f5c">
+<meta name="theme-color" content="#f2f2f7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -14,118 +14,156 @@
 <link rel="icon" href="icon-192.png">
 <style>
 :root{
-  --bg:#f6f5f2; --card:#ffffff; --text:#1d1d1f; --muted:#6e6e73; --line:#e6e4df;
-  --accent:#1f6f5c; --accent-soft:#e3f0ec; --danger:#c0392b; --chip:#efede8; --pos:#1e8e3e;
+  --bg:#f2f2f7; --card:#ffffff; --text:#000000; --muted:#8a8a8e; --line:#c6c6c8; --fill:rgba(118,118,128,.12);
+  --accent:#007aff; --accent-soft:rgba(0,122,255,.12); --danger:#ff3b30; --pos:#248a3d; --chip:rgba(118,118,128,.12);
+  --bar:rgba(249,249,249,.94);
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#121212; --card:#1c1c1e; --text:#f2f2f2; --muted:#9a9a9f; --line:#2c2c2e;
-    --accent:#4fbf9f; --accent-soft:#1d3530; --danger:#ff6b5b; --chip:#2a2a2c; --pos:#5fd38a; }
+  :root{ --bg:#000000; --card:#1c1c1e; --text:#ffffff; --muted:#8d8d93; --line:#38383a; --fill:rgba(118,118,128,.24);
+    --accent:#0a84ff; --accent-soft:rgba(10,132,255,.2); --danger:#ff453a; --pos:#30d158; --chip:rgba(118,118,128,.24); --bar:rgba(22,22,24,.92); }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif;font-size:16px}
-body{padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(76px + env(safe-area-inset-bottom)) env(safe-area-inset-left)}
-.wrap{max-width:760px;margin:0 auto;padding:16px}
-h1{font-size:22px;margin:4px 0 14px;font-weight:700}
-h2{font-size:15px;margin:22px 0 10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:10px}
-.status{font-size:13px;color:var(--muted);margin-bottom:10px;min-height:18px;display:flex;justify-content:space-between;align-items:center;gap:8px}
-.status button{background:none;border:0;color:var(--accent);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif;font-size:17px;letter-spacing:-.2px;-webkit-font-smoothing:antialiased}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(84px + env(safe-area-inset-bottom)) env(safe-area-inset-left)}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 16px}
+h1{font-size:34px;line-height:41px;margin:2px 0 8px;font-weight:700;letter-spacing:.37px}
+h2{font-size:13px;margin:26px 16px 7px;color:var(--muted);font-weight:400;text-transform:uppercase;letter-spacing:-.08px}
+.card{background:var(--card);border:0;border-radius:10px;padding:11px 16px;margin-bottom:0}
+.card + .card{margin-top:16px}
+.status{font-size:13px;color:var(--muted);padding:10px 0 2px;min-height:18px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.status button{background:none;border:0;color:var(--accent);font:inherit;font-size:17px;cursor:pointer;padding:4px 0}
 .status.err #stxt{color:var(--danger)}
-.status.err{color:var(--danger)}
-nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom);z-index:5}
-nav button{flex:1;max-width:160px;font-size:12px!important;background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:12px 4px 14px;cursor:pointer}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;max-width:140px;background:none;border:0;color:var(--muted);font:inherit;font-size:10px;font-weight:500;letter-spacing:.1px;padding:7px 2px 5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--accent)}
+nav button.on svg .f{fill:currentColor}
+nav button.on svg .in{stroke:#fff}
 .amount-row{display:flex;align-items:center;gap:8px}
-.amount{flex:1;font-size:40px;font-weight:700;border:0;background:transparent;color:var(--text);width:100%;outline:none;font-family:inherit}
+.amount{flex:1;font-size:44px;font-weight:600;border:0;background:transparent;color:var(--text);width:100%;outline:none;font-family:inherit;letter-spacing:-.5px;padding:6px 0;font-variant-numeric:tabular-nums}
 .amount::placeholder{color:var(--line)}
-.eur{font-size:32px;font-weight:600;color:var(--muted)}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-@media (min-width:600px){.grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}}
-.cat{display:flex;align-items:center;gap:6px;padding:10px 8px;min-height:52px;line-height:1.2;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;font-size:13px;font-weight:500;cursor:pointer;text-align:left}
-.cat.on{border-color:var(--accent);background:var(--accent-soft)}
-.dot{width:10px;height:10px;border-radius:50%;flex:none}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.chip{padding:8px 12px;border-radius:999px;background:var(--chip);border:1px solid transparent;color:var(--text);font:inherit;font-size:14px;cursor:pointer}
-.chip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
-input[type=text],input[type=date],input[type=month],input[type=number],select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:16px}
-label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
-.row{display:flex;gap:8px}.row>*{flex:1}
-.btn{display:block;width:100%;padding:15px;border-radius:12px;border:0;background:var(--accent);color:#fff;font:inherit;font-size:16px;font-weight:600;cursor:pointer;margin-top:14px}
-.btn:disabled{opacity:.4;cursor:default}
-.btn.sec{background:var(--chip);color:var(--text)}
-.btn.small{display:inline-block;width:auto;padding:9px 14px;font-size:14px;margin-top:0}
-.btn.danger{background:none;color:var(--danger);border:1px solid var(--danger)}
-.quick{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:4px}
-.quick .chip{white-space:nowrap}
-.toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:500;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.eur{font-size:34px;font-weight:500;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+@media (min-width:600px){.grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+.cat{display:flex;align-items:center;gap:8px;padding:10px;min-height:54px;line-height:1.2;border-radius:10px;border:0;background:var(--card);color:var(--text);font:inherit;font-size:14px;cursor:pointer;text-align:left;box-shadow:inset 0 0 0 1.5px transparent}
+.cat.on{background:var(--accent-soft);box-shadow:inset 0 0 0 1.5px var(--accent);color:var(--accent);font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{padding:7px 12px;border-radius:8px;background:var(--chip);border:0;color:var(--text);font:inherit;font-size:15px;cursor:pointer}
+.chip.on{background:var(--accent);color:#fff;font-weight:500}
+input[type=text],input[type=date],input[type=month],input[type=number],select{width:100%;padding:11px 12px;border-radius:10px;border:0;background:var(--fill);color:var(--text);font:inherit;font-size:17px;-webkit-appearance:none;appearance:none;min-height:44px}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+#search{background:var(--fill);margin-bottom:4px}
+label.l{display:block;font-size:13px;color:var(--muted);margin:14px 4px 6px}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+.btn{display:block;width:100%;min-height:50px;padding:14px;border-radius:12px;border:0;background:var(--accent);color:#fff;font:inherit;font-size:17px;font-weight:600;cursor:pointer;margin-top:16px}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.sec{background:var(--card);color:var(--accent);font-weight:400;border-radius:10px}
+.sheet .btn.sec{background:var(--card)}
+.btn.small{display:inline-block;width:auto;min-height:0;padding:8px 14px;font-size:15px;margin-top:0;border-radius:8px}
+.btn.sec.small{background:var(--fill);font-weight:500}
+.btn.danger{background:var(--card);color:var(--danger);font-weight:400;border-radius:10px}
+.quick{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;margin:4px 0 12px;scrollbar-width:none}
+.quick::-webkit-scrollbar{display:none}
+.quick .chip{white-space:nowrap;background:var(--card)}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(30,30,30,.92);color:#fff;padding:11px 18px;border-radius:12px;font-size:15px;font-weight:500;opacity:0;transition:opacity .2s;pointer-events:none;z-index:40}
 .toast.show{opacity:1}
-.day{font-size:13px;color:var(--muted);font-weight:600;margin:16px 4px 6px;display:flex;justify-content:space-between}
-.item{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:6px;cursor:pointer}
+.day{font-size:13px;color:var(--muted);text-transform:uppercase;margin:24px 16px 7px;display:flex;justify-content:space-between}
+.item{display:flex;align-items:center;gap:12px;padding:11px 16px;background:var(--card);cursor:pointer;position:relative;min-height:56px}
+.item::after{content:'';position:absolute;left:38px;right:0;bottom:0;border-bottom:.5px solid var(--line)}
+.item:first-child,.day + .item,h2 + .item{border-top-left-radius:10px;border-top-right-radius:10px}
+.item:last-child,.item:has(+ .day),.item:has(+ h2),.item:has(+ .empty){border-bottom-left-radius:10px;border-bottom-right-radius:10px}
+.item:last-child::after,.item:has(+ .day)::after,.item:has(+ h2)::after{display:none}
 .item .t{flex:1;min-width:0}
-.item .t b{font-weight:500;font-size:15px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.item .t span{font-size:13px;color:var(--muted)}
-.item .a{font-weight:600;font-variant-numeric:tabular-nums}
-.monthnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.monthnav button{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:10px;width:42px;height:42px;font-size:18px;cursor:pointer}
-.monthnav b{font-size:18px}
+.item .t b{font-weight:400;font-size:17px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .t span{font-size:13px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .a{font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.monthnav{display:flex;align-items:center;justify-content:space-between;margin:4px 0 12px}
+.monthnav button{background:none;border:0;color:var(--accent);width:44px;height:36px;font-size:24px;cursor:pointer}
+.monthnav b{font-size:17px;font-weight:600}
 .big{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums}
-.sub{color:var(--muted);font-size:14px}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
-.kpis div{background:var(--bg);border-radius:10px;padding:10px}
-.kpis small{display:block;color:var(--muted);font-size:12px}
-.kpis b{font-variant-numeric:tabular-nums}
-.bar{height:8px;border-radius:4px;background:var(--chip);overflow:hidden;margin-top:6px}
-.bar i{display:block;height:100%;border-radius:4px}
-.catline{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.sub{color:var(--muted);font-size:15px;line-height:1.35}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.kpis div{background:var(--fill);border-radius:10px;padding:9px 10px;min-width:0}
+.kpis small{display:block;color:var(--muted);font-size:12px;margin-bottom:2px}
+.kpis b{display:block;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;font-size:15px}
+.kpis.two{grid-template-columns:repeat(2,1fr)}
+.tile-big b{font-size:17px}
+.bar{height:6px;border-radius:3px;background:var(--fill);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;border-radius:3px}
+.catline{padding:11px 0;border-bottom:.5px solid var(--line);cursor:pointer;min-height:44px}
 .catline:last-child{border-bottom:0}
-.catline .h{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.catline .h span{display:flex;align-items:center;gap:8px;font-weight:500}
-.catline .h b{font-variant-numeric:tabular-nums}
-.subs{margin:8px 0 0 18px;font-size:14px;color:var(--muted)}
+.catline .h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.catline .h span{display:flex;align-items:center;gap:10px;min-width:0}
+.catline .h b{font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
+.catline.chev .h b::after{content:'';display:inline-block;width:7px;height:7px;border-right:2px solid var(--line);border-top:2px solid var(--line);transform:rotate(45deg);margin:0 2px 2px 10px}
+.subs{margin:8px 0 0 20px;font-size:15px;color:var(--muted)}
 .subs div{display:flex;justify-content:space-between;padding:3px 0}
 .chart{display:flex;align-items:flex-end;gap:8px;height:150px;padding-top:10px}
 .chart .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer}
-.chart .c i{display:block;width:100%;max-width:46px;border-radius:6px 6px 0 0;background:var(--accent);opacity:.55}
+.chart .c i{display:block;width:100%;max-width:46px;border-radius:4px 4px 0 0;background:var(--accent);opacity:.45}
 .chart .c.on i{opacity:1}
 .chart .c i.fx{background:var(--muted);opacity:.35;border-radius:0}
 .chart .c small{font-size:11px;color:var(--muted);margin-top:6px}
 .chart .c em{font-style:normal;font-size:11px;font-weight:600;margin-bottom:4px;font-variant-numeric:tabular-nums}
-.debt .h{display:flex;justify-content:space-between;align-items:baseline}
-.debt .h b{font-size:17px}
-.muted{color:var(--muted)}
-.empty{color:var(--muted);text-align:center;padding:24px 8px;font-size:15px}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:30}
-.overlay.show{display:flex}
-.sheet{background:var(--card);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
-@media (min-width:700px){.overlay{align-items:center}.sheet{border-radius:20px}}
-.sheet h3{margin:0 0 6px;font-size:18px}
-.hidden{display:none!important}
-.seg{display:flex;background:var(--chip);border-radius:12px;padding:3px;margin-bottom:12px}
-.seg button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:15px;font-weight:600;padding:9px;border-radius:10px;cursor:pointer}
-.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.seg button.on.in{color:var(--pos)}
-.pos{color:var(--pos)}.neg{color:var(--danger)}
-.kpis.two{grid-template-columns:repeat(2,1fr)}
-.kpis div{min-width:0}
-.kpis b{display:block;overflow-wrap:anywhere}
-.tile-big b{font-size:17px}
 .chart .c .bars{display:flex;align-items:flex-end;gap:3px;height:100%;width:100%;justify-content:center}
 .chart .c .stack{display:flex;flex-direction:column;justify-content:flex-end;height:100%;width:62%;max-width:34px}
 .chart .c .stack i{width:100%;max-width:none}
-.chart .c i.inc{width:22%;max-width:12px;background:var(--pos);opacity:.7;border-radius:4px 4px 0 0}
+.chart .c i.inc{width:22%;max-width:12px;background:var(--pos);opacity:.75;border-radius:3px 3px 0 0}
+.debt{cursor:pointer}
+.debt .h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.debt .h b{font-size:17px;font-weight:600}
+.debt .h span{font-variant-numeric:tabular-nums;white-space:nowrap}
+#debts .card + .card{margin-top:10px}
+.muted{color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:22px 8px;font-size:15px;background:var(--card);border-radius:10px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-end;justify-content:center;z-index:30}
+.overlay.show{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:560px;border-radius:12px 12px 0 0;padding:8px 16px calc(24px + env(safe-area-inset-bottom));max-height:93vh;overflow:auto}
+.sheet::before{content:'';display:block;width:36px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 14px}
+@media (min-width:700px){.overlay{align-items:center}.sheet{border-radius:12px}}
+.sheet h3{margin:0 0 6px;font-size:22px;font-weight:700;letter-spacing:.35px}
+.sheet h2{margin:22px 4px 6px}
+.hidden{display:none!important}
+.seg{display:flex;background:var(--fill);border-radius:9px;padding:2px;margin:4px 0 14px}
+.seg button{flex:1;border:0;background:none;color:var(--text);font:inherit;font-size:13px;font-weight:500;padding:7px 4px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--card);font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04)}
+@media (prefers-color-scheme: dark){.seg button.on{background:#636366}}
+.pos{color:var(--pos)}.neg{color:var(--danger)}
 .duesoon{color:var(--danger);font-weight:600}
-.profit{font-weight:600}
 .secthead{display:flex;justify-content:space-between;align-items:baseline}
+.secthead h2{flex:1}
+.secthead .sub{font-size:13px;margin-right:16px}
 .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+/* Übersicht */
+.hero{padding:18px 16px 14px}
+.hero .lbl{font-size:15px;color:var(--muted)}
+.hero .amt{font-size:44px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums;margin:2px 0}
+.hero .per{font-size:17px}
+.hero .split{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;padding-top:12px;border-top:.5px solid var(--line)}
+.hero .split small{display:block;font-size:12px;color:var(--muted)}
+.hero .split b{font-weight:500;font-size:15px;font-variant-numeric:tabular-nums}
+.link{background:none;border:0;color:var(--accent);font:inherit;font-size:15px;padding:10px 0 0;cursor:pointer}
+.warn .h span::before{content:'!';display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:5px;background:#ff9500;color:#fff;font-weight:700;font-size:13px;flex:none}
+.warn .h span{font-size:15px;line-height:1.3}
+.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;display:block}
+.diff{margin-top:12px;padding:12px;border-radius:10px;background:var(--fill);font-size:15px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="status" id="status"><span id="stxt"></span><button id="opensettings">Einstellungen</button></div>
 
+  <!-- ÜBERSICHT -->
+  <section id="v-home">
+    <h1>Übersicht</h1>
+    <div id="home"></div>
+  </section>
+
   <!-- ERFASSEN -->
-  <section id="v-add">
+  <section id="v-add" class="hidden">
+    <h1>Erfassen</h1>
     <div class="seg" id="mode"><button data-m="out" class="on">Ausgabe</button><button data-m="in" class="in">Einnahme</button><button data-m="tr">Umbuchung</button></div>
     <div class="quick" id="quick"></div>
     <div class="card">
@@ -143,12 +181,12 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
     </div>
     <div id="trpick" class="hidden">
       <div class="row"><div><label class="l">Von</label><select id="trfrom"></select></div><div><label class="l">Nach</label><select id="trto"></select></div></div>
-      <div class="sub" style="margin-top:8px">Zum Beispiel Bargeld abheben: von Alltagskonto nach Bargeld. Zählt nicht als Ausgabe.</div>
+      <div class="sub" style="margin:8px 4px 0;font-size:13px">Zum Beispiel Bargeld abheben: von Alltagskonto nach Bargeld. Zählt nicht als Ausgabe.</div>
     </div>
-    <div id="accpick"><label class="l" id="acclabel">Bezahlt von</label><div class="chips" id="accs" style="margin-top:4px"></div></div>
+    <div id="accpick"><label class="l" id="acclabel">Bezahlt von</label><div class="chips" id="accs" style="margin-top:0"></div></div>
     <div class="row">
       <div><label class="l">Notiz (optional)</label><input type="text" id="note" placeholder="z. B. Rewe, Asiamarkt" autocomplete="off"></div>
-      <div style="flex:0 0 160px"><label class="l">Datum</label><input type="date" id="date"></div>
+      <div style="flex:0 0 150px"><label class="l">Datum</label><input type="date" id="date"></div>
     </div>
     <button class="btn" id="save" disabled>Speichern</button>
   </section>
@@ -156,15 +194,14 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
   <!-- VERLAUF -->
   <section id="v-list" class="hidden">
     <h1>Verlauf</h1>
-    <input type="text" id="search" placeholder="Suchen (Notiz, Kategorie)" autocomplete="off">
+    <input type="text" id="search" placeholder="Suchen" autocomplete="off">
     <div id="list"></div>
   </section>
 
-  <!-- AUSWERTUNG -->
+  <!-- STATISTIK -->
   <section id="v-stats" class="hidden">
-    <h1>Auswertung</h1>
-    <div class="card" id="free"></div>
-    <div class="monthnav"><button id="mprev">‹</button><b id="mlabel"></b><button id="mnext">›</button></div>
+    <h1>Statistik</h1>
+    <div class="monthnav"><button id="mprev" aria-label="Vormonat">‹</button><b id="mlabel"></b><button id="mnext" aria-label="Nächster Monat">›</button></div>
     <div class="card">
       <div class="kpis tile-big" style="margin-top:0">
         <div><small>Einnahmen</small><b id="kin" class="pos"></b></div>
@@ -176,13 +213,13 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
         <div><small>Fixkosten</small><b id="kfix"></b></div>
         <div><small>Essen &amp; Trinken</small><b id="kfood"></b></div>
       </div>
-      <div class="sub" id="kday" style="margin-top:10px"></div>
-      <div class="sub" id="kcompare" style="margin-top:6px"></div>
+      <div class="sub" id="kday" style="margin-top:12px;font-size:13px"></div>
+      <div class="sub" id="kcompare" style="margin-top:6px;font-size:13px"></div>
     </div>
+    <h2>Letzte 6 Monate</h2>
     <div class="card">
-      <div class="sub">Letzte 6 Monate</div>
       <div class="chart" id="chart"></div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>Variabel</span><span><i style="background:var(--muted);opacity:.5"></i>Fixkosten</span><span><i style="background:var(--pos);opacity:.7"></i>Einnahmen</span></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Variabel</span><span><i style="background:var(--muted);opacity:.5"></i>Fixkosten</span><span><i style="background:var(--pos);opacity:.75"></i>Einnahmen</span></div>
     </div>
     <h2>Ausgaben nach Kategorie</h2>
     <div class="card" id="bycat"></div>
@@ -191,49 +228,58 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
     <button class="btn sec" id="export">Alle Daten als CSV kopieren</button>
   </section>
 
-  <!-- HANDEL -->
-  <section id="v-trade" class="hidden">
-    <h1>Handel</h1>
-    <div class="card">
-      <div class="kpis" style="margin-top:0">
-        <div><small>Gewinn gesamt</small><b id="tsum"></b></div>
-        <div><small>Gewinn im Monat</small><b id="tmonth"></b></div>
-        <div><small>Im Lager</small><b id="tstock"></b></div>
-      </div>
-    </div>
-    <button class="btn" id="addtrade">Ankauf erfassen</button>
-    <h2>Im Lager</h2>
-    <div id="tradesopen"></div>
-    <h2>Verkauft</h2>
-    <div id="tradesdone"></div>
-  </section>
-
   <!-- FINANZEN -->
   <section id="v-fix" class="hidden">
     <h1>Finanzen</h1>
-    <h2>Konten und Bargeld</h2>
-    <div id="balance"></div>
-    <h2>Nächste Buchungen</h2>
-    <div id="upcoming"></div>
-    <div class="secthead"><h2>Schulden</h2><span class="sub" id="debtsum"></span></div>
-    <div id="debts"></div>
-    <button class="btn sec" id="adddebt">Schulden hinzufügen</button>
-    <h2>Feste Einnahmen</h2>
-    <div id="fixedin"></div>
-    <button class="btn sec" id="addfixin">Feste Einnahme hinzufügen</button>
-    <h2>Monatliche Fixkosten</h2>
-    <div class="sub" style="margin:-4px 4px 10px">Werden jeden Monat automatisch mitgezählt, du musst sie nicht eintragen.</div>
-    <div id="fixed"></div>
-    <button class="btn sec" id="addfix">Fixkosten hinzufügen</button>
+    <div class="seg" id="finseg"><button data-f="acc" class="on">Konten</button><button data-f="fix">Fest</button><button data-f="debt">Schulden</button><button data-f="trade">Handel</button></div>
+
+    <div id="f-acc">
+      <h2>Konten und Bargeld</h2>
+      <div id="balance"></div>
+      <h2>Nächste Buchungen</h2>
+      <div id="upcoming"></div>
+    </div>
+
+    <div id="f-fix" class="hidden">
+      <h2>Feste Einnahmen</h2>
+      <div id="fixedin"></div>
+      <button class="btn sec" id="addfixin">Feste Einnahme hinzufügen</button>
+      <h2>Fixkosten</h2>
+      <div id="fixed"></div>
+      <button class="btn sec" id="addfix">Fixkosten hinzufügen</button>
+      <div class="sub" style="margin:10px 16px 0;font-size:13px">Feste Buchungen zählt die App jeden Monat automatisch, du musst sie nicht einzeln erfassen. Nur mit Tag werden sie auch vom Konto abgezogen.</div>
+    </div>
+
+    <div id="f-debt" class="hidden">
+      <div class="secthead"><h2>Schulden</h2><span class="sub" id="debtsum"></span></div>
+      <div id="debts"></div>
+      <button class="btn sec" id="adddebt">Schulden hinzufügen</button>
+    </div>
+
+    <div id="v-trade" class="hidden">
+      <h2>Handel</h2>
+      <div class="card">
+        <div class="kpis" style="margin-top:0">
+          <div><small>Gewinn gesamt</small><b id="tsum"></b></div>
+          <div><small>Gewinn im Monat</small><b id="tmonth"></b></div>
+          <div><small>Im Lager</small><b id="tstock"></b></div>
+        </div>
+      </div>
+      <button class="btn sec" id="addtrade">Ankauf erfassen</button>
+      <h2>Im Lager</h2>
+      <div id="tradesopen"></div>
+      <h2>Verkauft</h2>
+      <div id="tradesdone"></div>
+    </div>
   </section>
 </div>
 
 <nav>
-  <button data-v="add" class="on">Erfassen</button>
-  <button data-v="list">Verlauf</button>
-  <button data-v="stats">Auswertung</button>
-  <button data-v="trade">Handel</button>
-  <button data-v="fix">Finanzen</button>
+  <button data-v="home" class="on"><svg viewBox="0 0 28 28"><path class="f" d="M4.5 13 14 5l9.5 8v10a1 1 0 0 1-1 1H17v-6h-6v6H5.5a1 1 0 0 1-1-1z"/></svg>Übersicht</button>
+  <button data-v="list"><svg viewBox="0 0 28 28"><path d="M10 7.5h13M10 14h13M10 20.5h13"/><circle class="f" cx="5.5" cy="7.5" r="1.3"/><circle class="f" cx="5.5" cy="14" r="1.3"/><circle class="f" cx="5.5" cy="20.5" r="1.3"/></svg>Verlauf</button>
+  <button data-v="add"><svg viewBox="0 0 28 28"><circle class="f" cx="14" cy="14" r="10.5"/><path class="in" d="M14 9v10M9 14h10"/></svg>Erfassen</button>
+  <button data-v="stats"><svg viewBox="0 0 28 28"><path class="f" d="M5 23V15h4v8zM12 23V6h4v17zM19 23v-11h4v11z"/></svg>Statistik</button>
+  <button data-v="fix"><svg viewBox="0 0 28 28"><rect class="f" x="3.5" y="7" width="21" height="15" rx="2.5"/><path class="in" d="M3.5 11.5h21M18 17h3"/></svg>Finanzen</button>
 </nav>
 
 <div class="overlay" id="ov"><div class="sheet" id="sheet"></div></div>
