@@ -580,7 +580,6 @@ function editDebt(id){
 
 /* ---------- Handel ---------- */
 $('#addtrade').onclick=()=>editTrade(null);
-$('#addcomm').onclick=()=>editTrade(null,'comm');
 function renderTrades(){
   const sold = TRADES.filter(t=>t.sellDate), open = TRADES.filter(t=>!t.sellDate);
   const sum = sold.reduce((a,t)=>a+tradeProfit(t),0);
@@ -595,7 +594,7 @@ function renderTrades(){
   document.querySelectorAll('#v-trade .item').forEach(el=>el.onclick=()=>editTrade(el.dataset.id));
 }
 function editTrade(id, kind){
-  const t = id ? {...S.trades[id]} : {id:uid(),type:kind||'own',item:'',buyDate:today(),buyPrice:'',buyCosts:'',sellDate:kind==='comm'?today():'',sellPrice:'',fees:'',note:'',buyAccount:S.prefs.accOut||'Alltagskonto',sellAccount:S.prefs.accOut||'Alltagskonto'};
+  const t = id ? {...S.trades[id]} : {id:uid(),type:kind||'own',item:'',buyDate:today(),buyPrice:'',buyCosts:'',sellDate:kind==='comm'?today():'',sellPrice:'',fees:'',note:'',buyAccount:S.prefs.tradeBuy??'',sellAccount:S.prefs.tradeSell||S.prefs.accOut||'Alltagskonto'};
   const comm = t.type==='comm';
   const val = k => { const v=$('#'+k).value.trim(); return v?parseAmt(v):0; };
   if(comm){
@@ -622,13 +621,14 @@ function editTrade(id, kind){
     ${accountField('t-bacc', t.buyAccount||'').replace('>Konto<','>Bezahlt von<')}
     <h2 style="margin-top:16px">Verkauf</h2>
     <div class="row"><div><label class="l">Datum</label><input type="date" id="t-sd" value="${esc(t.sellDate||'')}"></div><div><label class="l">Preis (€)</label><input type="text" id="t-sp" inputmode="decimal" value="${esc(numIn(t.sellPrice))}"></div></div>
-    <label class="l">Provision und Gebühren (€)</label><input type="text" id="t-fe" inputmode="decimal" value="${esc(numIn(t.fees))}">
     ${accountField('t-sacc', t.sellAccount||'').replace('>Konto<','>Geld eingegangen auf<')}
+    <label class="l">Provision an Mitkäufer und Gebühren (€)</label><input type="text" id="t-fe" inputmode="decimal" value="${+t.fees?esc(numIn(t.fees)):''}" placeholder="wird vom Verkaufsgeld abgezogen">
     <label class="l">Notiz</label><input type="text" id="t-note" value="${esc(t.note||'')}">
     <div class="sub" id="t-profit" style="margin-top:12px"></div>
     <button class="btn" id="t-save">Speichern</button>${delRow(!!id)}`;
   // alte Einträge ohne Konto: Feld leer lassen = kein Kontoeffekt
-  [['t-bacc',t.buyAccount],['t-sacc',t.sellAccount]].forEach(([k,v])=>{ if(!v){ $('#'+k).insertAdjacentHTML('afterbegin','<option value="">kein Konto</option>'); $('#'+k).value=''; } });
+  $('#t-bacc').insertAdjacentHTML('afterbegin','<option value="">nicht von meinem Konto</option>'); if(!t.buyAccount) $('#t-bacc').value='';
+  if(!t.sellAccount){ $('#t-sacc').insertAdjacentHTML('afterbegin','<option value="">kein Konto</option>'); $('#t-sacc').value=''; }
   wireAccount('t-bacc'); wireAccount('t-sacc');
   const calc = () => { const sp=val('t-sp'); const p=sp-val('t-bp')-val('t-bc')-val('t-fe');
     $('#t-profit').innerHTML = sp ? `Gewinn: <b class="${p>=0?'pos':'neg'}">${fmt(p)}</b>` : `Eingesetzt: <b>${fmt(val('t-bp')+val('t-bc'))}</b>`; };
@@ -638,6 +638,7 @@ function editTrade(id, kind){
   $('#t-save').onclick=()=>{ const item=$('#t-item').value.trim(); const bp=val('t-bp');
     if(!item||!(bp>=0)) return toast('Artikel und Ankaufpreis angeben');
     const sp=val('t-sp');
+    S.prefs.tradeBuy=readAccount('t-bacc'); if(readAccount('t-sacc')) S.prefs.tradeSell=readAccount('t-sacc');
     put('trades',{...t, type:'own', item, buyDate:$('#t-bd').value||today(), buyPrice:bp, buyCosts:val('t-bc')||0, sellDate:sp?($('#t-sd').value||today()):'', sellPrice:sp||'', fees:val('t-fe')||0, note:$('#t-note').value.trim(), buyAccount:readAccount('t-bacc'), sellAccount:readAccount('t-sacc')});
     closeSheet(); toast('Gespeichert'); };
   openSheet();
