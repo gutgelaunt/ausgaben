@@ -314,7 +314,7 @@ function debtSim(d){
   const n=Math.max(0,mDiff(start,now));
   for(let k=0;k<=n;k++){
     const m=addM(start,k);
-    if(rate && bal>0.005){ const p=Math.min(rate,bal); rates[m]=p; bal-=p; }
+    if(rate && bal>0.005 && (!d.rateStart || m>=d.rateStart)){ const p=Math.min(rate,bal); rates[m]=p; bal-=p; }
     const ex=extras[m]||0; bal-=ex; extra+=ex;
     if(k<n && bal>0.005 && z){ const i=bal*z; bal+=i; interest+=i; }
   }
@@ -352,10 +352,24 @@ const accounts = () => { const a=[...DEFAULT_ACCOUNTS]; [...BALS.map(b=>b.accoun
 const bookDate = (f,m) => m+'-'+String(Math.min(+f.day||1, daysIn(m))).padStart(2,'0');
 const fixActive = (f,m) => f.active!==false && !(f.start && m<f.start) && !(f.end && m>f.end);
 // feste Buchungen (Einnahmen +, Kosten −) eines Kontos zwischen zwei Daten (from exklusiv, to inklusiv)
+// Rate einer Schuld in Monat m: vergangene Monate aus der Simulation, künftige als Plan
+function debtRateFor(d,m){
+  const s=SIM[d.id]; if(!s || !(+d.rate) || !d.day) return 0;
+  if(d.rateStart && m<d.rateStart) return 0;
+  if(m<=ym(today())) return s.rates[m]||0;
+  return s.remaining>0.005 ? Math.min(+d.rate, s.remaining) : 0;
+}
+function debtBookings(m, from, to, account){
+  const out=[];
+  DEBTS.forEach(d=>{ const a=debtRateFor(d,m); if(!a) return; if(account && (d.account||'')!==account) return;
+    const dt=bookDate(d,m); if(dt>from && (to.inclusive ? dt<=to.date : dt<to.date)) out.push({date:dt,name:'Rate '+d.name,amount:-a,acc:d.account}); });
+  return out;
+}
 function fixedBookings(from, to, account){
   const out=[]; if(!from || to<=from) return out;
   let m=ym(from); const last=ym(to);
   for(let k=0;k<36 && m<=last;k++,m=addM(m,1)){
+    out.push(...debtBookings(m, from, {date:to,inclusive:true}, account));
     [...FIXIN.map(f=>({f,sign:1})), ...FIX.map(f=>({f,sign:-1}))].forEach(({f,sign})=>{
       if(!fixActive(f,m) || !f.day) return;
       if(account && (f.account||'')!==account) return;
@@ -381,6 +395,7 @@ function upcoming(n){
     FIXIN.forEach(f=>{ if(fixActive(f,m) && f.day){ const d=bookDate(f,m); if(d>=t) items.push({date:d,name:f.name,amount:+f.amount||0,acc:f.account}); } });
     FIX.forEach(f=>{ if(fixActive(f,m) && f.day){ const d=bookDate(f,m); if(d>=t) items.push({date:d,name:f.name,amount:-(+f.amount||0),acc:f.account}); } });
     DEBTS.forEach(d=>{ if(d.due && ym(d.due)===m && d.due>=t && SIM[d.id].remaining>0.005) items.push({date:d.due,name:d.name+' (fällig)',amount:-SIM[d.id].remaining}); });
+    items.push(...debtBookings(m, addDays(t,-1), {date:'9999-12-31'}));
   });
   return items.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,n);
 }
@@ -397,6 +412,7 @@ function bookingsBetween(from, to){ // from exklusiv, to exklusiv
   for(let k=0;k<4 && m<=ym(to);k++,m=addM(m,1)){
     FIXIN.forEach(f=>{ if(fixActive(f,m) && f.day){ const d=bookDate(f,m); if(d>from && d<to) items.push({date:d,name:f.name,amount:+f.amount||0,acc:f.account}); } });
     FIX.forEach(f=>{ if(fixActive(f,m) && f.day){ const d=bookDate(f,m); if(d>from && d<to) items.push({date:d,name:f.name,amount:-(+f.amount||0),acc:f.account}); } });
+    items.push(...debtBookings(m, from, {date:to}));
   }
   DEBTS.forEach(d=>{ if(d.due && d.due>from && d.due<to && SIM[d.id].remaining>0.005) items.push({date:d.due,name:d.name+' (fällig)',amount:-SIM[d.id].remaining}); });
   return items.sort((a,b)=>a.date.localeCompare(b.date));
@@ -441,7 +457,7 @@ function renderFix(){
     const end = s.monthsLeft ? mLabel(addM(ym(today()),s.monthsLeft),true) : null;
     const open = s.remaining>0.005;
     const dueTxt = d.due && open ? `<span class="${d.due<=soon?'duesoon':''}">fällig ${dDE(d.due)}</span>` : '';
-    const bits = [ `${fmt(s.paid)} von ${fmt(base)} getilgt`, +d.rate?'Rate '+fmt(d.rate)+'/Monat':'', +d.interest?String(d.interest).replace('.',',')+' % Zinsen p.a.'+(s.interest?' (bisher '+fmt(s.interest)+')':''):'', end&&open?'schuldenfrei ca. '+end:'' ].filter(Boolean).join(' · ');
+    const bits = [ `${fmt(s.paid)} von ${fmt(base)} getilgt`, +d.rate?'Rate '+fmt(d.rate)+'/Monat'+(d.day?' am '+d.day+'.':'')+(d.rateStart&&d.rateStart>ym(today())?' ab '+mLabel(d.rateStart)+' '+d.rateStart.slice(2,4):'')+(d.account?' vom '+d.account:''):'', +d.interest?String(d.interest).replace('.',',')+' % Zinsen p.a.'+(s.interest?' (bisher '+fmt(s.interest)+')':''):'', end&&open?'schuldenfrei ca. '+end:'' ].filter(Boolean).join(' · ');
     return `<div class="card debt" data-id="${esc(d.id)}" style="cursor:pointer"><div class="h"><b>${esc(d.name)}</b><span class="${open?'':'muted'}">${open?'offen '+fmt(s.remaining):'abbezahlt'}</span></div>
       <div class="bar"><i style="width:${pct}%;background:var(--accent)"></i></div>
       <div class="sub" style="margin-top:8px">${dueTxt}${dueTxt&&bits?' · ':''}${bits}</div>${d.note?`<div class="sub" style="margin-top:4px">${esc(d.note)}</div>`:''}</div>`; }).join('') : '<div class="empty">Keine Schulden angelegt.</div>';
@@ -509,7 +525,7 @@ function editFixed(id, kind){
 }
 
 function editDebt(id){
-  const d = id ? {...S.debts[id]} : {id:uid(),name:'',total:'',rate:'',start:ym(today()),interest:'',due:'',note:''};
+  const d = id ? {...S.debts[id]} : {id:uid(),name:'',total:'',rate:'',start:ym(today()),interest:'',due:'',note:'',rateStart:'',day:'',account:''};
   const s = id ? SIM[id] : null;
   $('#sheet').innerHTML=`<h3>${id?esc(d.name):'Neue Schulden'}</h3>
     ${s?`<div class="sub">Offen: <b>${fmt(s.remaining)}</b>${s.interest?' (inkl. '+fmt(s.interest)+' Zinsen)':''}</div>
@@ -517,18 +533,24 @@ function editDebt(id){
     <label class="l">Bezeichnung</label><input type="text" id="d-name" value="${esc(d.name)}" placeholder="z. B. Sebastian, PayPal, Krankenkasse">
     <div class="row"><div><label class="l">Offener Betrag zum Start (€)</label><input type="text" id="d-total" inputmode="decimal" value="${esc(numIn(d.total))}"></div>
     <div><label class="l">Stand vom (Monat)</label><input type="month" id="d-start" value="${esc(d.start||'')}"></div></div>
-    <div class="row"><div><label class="l">Feste Rate pro Monat (€, optional)</label><input type="text" id="d-rate" inputmode="decimal" value="${+d.rate?esc(numIn(d.rate)):''}"></div>
-    <div><label class="l">Zinsen % pro Jahr (optional)</label><input type="text" id="d-int" inputmode="decimal" value="${+d.interest?esc(numIn(d.interest)):''}"></div></div>
+    <label class="l">Zinsen % pro Jahr (optional)</label><input type="text" id="d-int" inputmode="decimal" value="${+d.interest?esc(numIn(d.interest)):''}">
+    <h2 style="margin-top:16px">Monatliche Tilgung (optional)</h2>
+    <div class="row"><div><label class="l">Rate pro Monat (€)</label><input type="text" id="d-rate" inputmode="decimal" value="${+d.rate?esc(numIn(d.rate)):''}" placeholder="z. B. 150"></div>
+    <div style="flex:0 0 110px"><label class="l">Am Tag</label><input type="number" id="d-day" min="1" max="31" inputmode="numeric" placeholder="z. B. 21" value="${esc(d.day||'')}"></div></div>
+    <div class="row"><div><label class="l">Ab Monat</label><input type="month" id="d-rs" value="${esc(d.rateStart||addM(ym(today()),1))}"></div><div>${accountField('d-acc', d.account||DEFAULT_ACCOUNTS[0])}</div></div>
     <label class="l">Fällig bis (optional)</label><input type="date" id="d-due" value="${esc(d.due||'')}">
     <label class="l">Notiz</label><input type="text" id="d-note" value="${esc(d.note||'')}">
-    <div class="sub" style="margin-top:10px">Eine feste Rate wird jeden Monat automatisch abgezogen und bei den Fixkosten mitgezählt. Einzelne Rückzahlungen trägst du hier oben oder unter „Erfassen“ mit der Kategorie Schulden ein.</div>
+    <div class="sub" style="margin-top:10px">Die Rate wird ab dem gewählten Monat jeden Monat am Tag X vom Konto abgezogen, senkt die Schulden und zählt bei „Frei bis Gehalt“ mit. Einzelne Sonderzahlungen trägst du oben bei „Rückzahlung erfassen“ ein.</div>
     <button class="btn" id="d-save">Speichern</button>${delRow(!!id)}`;
+  wireAccount('d-acc');
   wireSheet('debts',id);
   if(s) $('#d-paybtn').onclick=()=>{ const a=parseAmt($('#d-pay').value); if(!(a>0)) return toast('Betrag prüfen');
     put('expenses',{id:uid(), amount:a, cat:'schulden', sub:'Rückzahlung', note:d.name, date:today(), debtId:d.id, account:S.prefs.accOut||'Alltagskonto'}); closeSheet(); toast(fmt(a)+' abgezogen'); };
   $('#d-save').onclick=()=>{ const t=parseAmt($('#d-total').value), r=$('#d-rate').value.trim()?parseAmt($('#d-rate').value):0, z=$('#d-int').value.trim()?parseAmt($('#d-int').value):0, n=$('#d-name').value.trim();
     if(!n||!(t>0)||!(r>=0)||!(z>=0)) return toast('Bezeichnung und Betrag angeben');
-    put('debts', {...d, name:n, total:t, rate:r||0, interest:z||0, start:$('#d-start').value||ym(today()), due:$('#d-due').value||'', note:$('#d-note').value.trim()});
+    const dy=parseInt($('#d-day').value,10);
+    if(r && !(dy>=1&&dy<=31)) return toast('Für die Rate einen Tag zwischen 1 und 31 angeben');
+    put('debts', {...d, name:n, total:t, rate:r||0, interest:z||0, start:$('#d-start').value||ym(today()), due:$('#d-due').value||'', note:$('#d-note').value.trim(), rateStart:r?($('#d-rs').value||addM(ym(today()),1)):'', day:r?dy:'', account:r?readAccount('d-acc'):''});
     closeSheet(); toast('Gespeichert'); };
   openSheet();
 }
