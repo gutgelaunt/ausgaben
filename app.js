@@ -1,19 +1,36 @@
 /* Ausgaben: Offline-first, Speicher lokal, Abgleich mit eigenem Google Sheet */
 const CATS = [
-  {id:'essen', name:'Essen & Trinken', color:'#e07a3f', subs:['Einkauf','Auswärts','Mensa','Snacks & Kaffee','Lieferdienst','Getränke']},
-  {id:'pflege', name:'Drogerie & Haushalt', color:'#c06bb5', subs:['Körperpflege','Haushalt','Apotheke']},
-  {id:'sport', name:'Sport', color:'#3f9e6b', subs:['Ausrüstung','Mitgliedschaft','Wettkampf','Sporternährung']},
-  {id:'mobil', name:'Mobilität', color:'#3a7bd5', subs:['ÖPNV & Bahn','Fahrrad','Auto & Sprit','Taxi & Sharing']},
-  {id:'freizeit', name:'Freizeit & Ausgehen', color:'#d4a017', subs:['Bars & Party','Kino & Events','Hobbys']},
-  {id:'shopping', name:'Shopping', color:'#d0506a', subs:['Kleidung','Elektronik','Sonstiges']},
-  {id:'uni', name:'Uni & Arbeit', color:'#5a8f9e', subs:['Bücher & Material','Software','Gebühren']},
-  {id:'wohnen', name:'Wohnen', color:'#8a6d4b', subs:['Miete','Nebenkosten & Strom','Internet','Einrichtung']},
-  {id:'vertraege', name:'Abos & Verträge', color:'#7c6fd6', subs:['Handy','Streaming','Versicherung','Software-Abo']},
-  {id:'reisen', name:'Reisen', color:'#2fa3a3', subs:['Anreise','Unterkunft','Vor Ort']},
-  {id:'geschenke', name:'Geschenke', color:'#e0607e', subs:[]},
-  {id:'schulden', name:'Schulden', color:'#6b7280', subs:['Rate','Rückzahlung']},
-  {id:'sonstiges', name:'Sonstiges', color:'#9aa0a6', subs:[]},
+  {id:'essen', name:'Essen & Trinken', color:'#f59e0b', subs:['Einkauf','Auswärts','Mensa','Snacks & Kaffee','Lieferdienst','Getränke']},
+  {id:'pflege', name:'Drogerie & Haushalt', color:'#ec4899', subs:['Körperpflege','Haushalt','Apotheke']},
+  {id:'sport', name:'Sport', color:'#10b981', subs:['Ausrüstung','Mitgliedschaft','Wettkampf','Sporternährung']},
+  {id:'mobil', name:'Mobilität', color:'#3b82f6', subs:['ÖPNV & Bahn','Fahrrad','Auto & Sprit','Taxi & Sharing']},
+  {id:'freizeit', name:'Freizeit & Ausgehen', color:'#a855f7', subs:['Bars & Party','Kino & Events','Hobbys']},
+  {id:'shopping', name:'Shopping', color:'#f43f5e', subs:['Kleidung','Elektronik','Sonstiges']},
+  {id:'uni', name:'Uni & Arbeit', color:'#06b6d4', subs:['Bücher & Material','Software','Gebühren']},
+  {id:'wohnen', name:'Wohnen', color:'#6366f1', subs:['Miete','Nebenkosten & Strom','Internet','Einrichtung']},
+  {id:'vertraege', name:'Abos & Verträge', color:'#0ea5e9', subs:['Handy','Streaming','Versicherung','Software-Abo']},
+  {id:'reisen', name:'Reisen', color:'#14b8a6', subs:['Anreise','Unterkunft','Vor Ort']},
+  {id:'geschenke', name:'Geschenke', color:'#e11d48', subs:[]},
+  {id:'schulden', name:'Schulden', color:'#64748b', subs:['Rate','Rückzahlung']},
+  {id:'sonstiges', name:'Sonstiges', color:'#94a3b8', subs:[]},
 ];
+const ICONS = {
+  essen:'M7 3v7M5 3v4a2 2 0 0 0 4 0V3M7 10v11M17 3c-1.7 0-3 2.2-3 5.5S15.3 13 17 13v8V3',
+  pflege:'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z',
+  sport:'M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11',
+  mobil:'M7 4h10a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a3 3 0 0 1 3-3zM4 11h16M8.5 20l1-3M15.5 20l-1-3',
+  freizeit:'M12 3.5l2.5 5.2 5.7.6-4.3 3.9 1.2 5.6L12 16l-5.1 2.8 1.2-5.6-4.3-3.9 5.7-.6z',
+  shopping:'M5 8h14l-1.2 12H6.2zM9 8V7a3 3 0 0 1 6 0v1',
+  uni:'M3 8l9-4 9 4-9 4zM7 10v5c0 1.5 2.5 3 5 3s5-1.5 5-3v-5',
+  wohnen:'M3.5 11L12 4l8.5 7M5.5 9.5V20h13V9.5M10 20v-5h4v5',
+  vertraege:'M8 2.5h8a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2zM11 18h2',
+  reisen:'M21 3L3 10.5l7 2.5 2.5 7z M10 13l4.5-4.5',
+  geschenke:'M4 11h16v9H4zM3 7.5h18V11H3zM12 7.5V20M12 7.5C10.5 4 7 4 7.5 6.5S12 7.5 12 7.5M12 7.5c1.5-3.5 5-3.5 4.5-1S12 7.5 12 7.5',
+  schulden:'M3 6h18v12H3zM3 10h18M7 15h3',
+  sonstiges:'M6 12h.01M12 12h.01M18 12h.01',
+  in:'M17 7L7 17M7 9v8h8', out:'M7 17L17 7M9 7h8v8', tr:'M5 9h13l-3.5-3.5M19 15H6l3.5 3.5', trade:'M4 7h16v13H4zM9 7V5h6v2M4 12h16'
+};
+const ico = (key, color, size) => `<span class="ic${size?' '+size:''}" style="--c:${color||CAT[key]?.color||'#94a3b8'}"><svg viewBox="0 0 24 24"><path d="${ICONS[key]||ICONS.sonstiges}"/></svg></span>`;
 const SOURCES = ['Gehalt','IT-Aufträge','Verkauf','Erstattung','Geschenk','Sonstiges'];
 const TABLE_NAMES = ['expenses','fixed','debts','income','trades','balances','transfers'];
 const CAT = Object.fromEntries(CATS.map(c=>[c.id,c]));
@@ -42,7 +59,7 @@ TABLE_NAMES.forEach(t=>{ if(!S[t]) S[t]={}; }); if(!S.prefs) S.prefs={};
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast('Lokales Speichern fehlgeschlagen'); } }
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 
-let TRS=[], EXP=[], INC=[], FIX=[], FIXIN=[], DEBTS=[], TRADES=[], BAL=null, BALS=[], SIM={};
+let REFI={ids:new Set(),pairs:[]}, TRS=[], EXP=[], INC=[], FIX=[], FIXIN=[], DEBTS=[], TRADES=[], BAL=null, BALS=[], SIM={};
 const DEFAULT_ACCOUNTS=['Gehaltskonto','Alltagskonto','Bargeld'];
 const live = o => Object.values(o).filter(x=>!x.deleted);
 const accOf = (e,kind) => e.account || (kind==='in'?'Gehaltskonto':'Alltagskonto');
@@ -58,6 +75,10 @@ function rebuild(){
   BAL = bl[0]||null;
   const seen={}; BALS=[]; bl.forEach(b=>{ if(!b.date) return; const k=b.account||'Konto'; if(!seen[k]){ seen[k]=1; BALS.push({...b,account:k}); } });
   SIM = {}; DEBTS.forEach(d=>SIM[d.id]=debtSim(d));
+  // Umschuldung: neu geliehen bei A und gleich hohe Rückzahlung an B am selben Tag
+  REFI={ids:new Set(),pairs:[]};
+  INC.filter(i=>i.debtId).forEach(i=>{ const e=EXP.find(e=>e.debtId && e.debtId!==i.debtId && e.date===i.date && Math.abs(e.amount-i.amount)<0.005 && !REFI.ids.has(e.id));
+    if(e){ REFI.ids.add(e.id); REFI.ids.add(i.id); REFI.pairs.push({inc:i,exp:e}); } });
 }
 function put(table, rec){
   rec = {...rec, updatedAt: Date.now()};
@@ -180,7 +201,7 @@ function renderCats(){
   }
   $('#srcs').innerHTML = SOURCES.map(s=>`<button class="chip ${sel.src===s?'on':''}">${esc(s)}</button>`).join('');
   document.querySelectorAll('#srcs .chip').forEach((b,i)=>b.onclick=()=>{ sel.src=SOURCES[i]; renderCats(); });
-  $('#cats').innerHTML = CATS.map(c=>`<button class="cat ${sel.cat===c.id?'on':''}" data-c="${c.id}"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</button>`).join('');
+  $('#cats').innerHTML = CATS.map(c=>`<button class="cat ${sel.cat===c.id?'on':''}" data-c="${c.id}">${ico(c.id)}<span>${esc(c.name)}</span></button>`).join('');
   document.querySelectorAll('#cats .cat').forEach(b=>b.onclick=()=>{ sel.cat=b.dataset.c; sel.sub=CAT[sel.cat].subs[0]||null; renderCats(); });
   const c = CAT[sel.cat];
   $('#subs').innerHTML = c && c.subs.length ? c.subs.map(s=>`<button class="chip ${sel.sub===s?'on':''}">${esc(s)}</button>`).join('') : '';
@@ -241,10 +262,10 @@ function renderList(){
   if(!rows.length){ $('#list').innerHTML = `<div class="empty">${all.length?'Nichts gefunden.':'Noch nichts erfasst.'}</div>`; return; }
   let html='', cur=null, chunk=[];
   const line = e => e._t==='in'
-    ? `<div class="item" data-id="${esc(e.id)}" data-t="in"><span class="dot" style="background:var(--pos)"></span><div class="t"><b>${esc(e.note||e.source||'Einnahme')}</b><span>Einnahme · ${esc(e.source||'')} · ${esc(accOf(e,'in'))}</span></div><div class="a pos">+${fmt(e.amount)}</div></div>`
+    ? `<div class="item" data-id="${esc(e.id)}" data-t="in">${ico('in','#10b981')}<div class="t"><b>${esc(e.note||e.source||'Einnahme')}</b><span>Einnahme · ${esc(e.source||'')} · ${esc(accOf(e,'in'))}</span></div><div class="a pos">+${fmt(e.amount)}</div></div>`
     : e._t==='tr'
-    ? `<div class="item" data-id="${esc(e.id)}" data-t="tr"><span class="dot" style="background:var(--muted)"></span><div class="t"><b>${esc(e.note||'Umbuchung')}</b><span>${esc(e.from)} → ${esc(e.to)}</span></div><div class="a muted">${fmt(e.amount)}</div></div>`
-    : `<div class="item" data-id="${esc(e.id)}" data-t="out"><span class="dot" style="background:${CAT[e.cat]?.color||'#999'}"></span><div class="t"><b>${esc(e.note||e.sub||CAT[e.cat]?.name)}</b><span>${esc(CAT[e.cat]?.name||e.cat)}${e.sub?' · '+esc(e.sub):''} · ${esc(accOf(e,'out'))}</span></div><div class="a">${fmt(e.amount)}</div></div>`;
+    ? `<div class="item" data-id="${esc(e.id)}" data-t="tr">${ico('tr','#64748b')}<div class="t"><b>${esc(e.note||'Umbuchung')}</b><span>${esc(e.from)} → ${esc(e.to)}</span></div><div class="a muted">${fmt(e.amount)}</div></div>`
+    : `<div class="item" data-id="${esc(e.id)}" data-t="out">${ico(e.cat)}<div class="t"><b>${esc(e.note||e.sub||CAT[e.cat]?.name)}</b><span>${esc(CAT[e.cat]?.name||e.cat)}${e.sub?' · '+esc(e.sub):''} · ${esc(accOf(e,'out'))}</span></div><div class="a">${fmt(e.amount)}</div></div>`;
   const flush=()=>{ if(!cur) return; const sum=chunk.reduce((a,e)=>a+(e._t==='out'?e.amount:0),0);
     const d=new Date(cur+'T12:00'); const lbl=isNaN(d)?cur:d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'long'});
     html+=`<div class="day"><span>${lbl}</span><span>${sum?fmt(sum):''}</span></div>`+chunk.map(line).join(''); };
@@ -352,7 +373,7 @@ const tradeProfit = t => (+t.sellPrice||0) - (+t.buyPrice||0) - (+t.buyCosts||0)
 // was beim Verkauf wirklich auf dem Konto landet
 const tradeCashIn = t => (+t.sellPrice||0) - (+t.fees||0) - (+t.partnerFee||0) - (!t.buyAccount && t.repay!==false && t.type!=='comm' ? (+t.buyPrice||0) : 0);
 function monthData(m){
-  const vars = EXP.filter(e=>ym(e.date)===m);
+  const vars = EXP.filter(e=>ym(e.date)===m && !REFI.ids.has(e.id));
   const fx = fixedFor(m);
   const incs = INC.filter(e=>ym(e.date)===m && !e.debtId);
   const fxin = fixedIncomeFor(m);
@@ -436,8 +457,10 @@ function bookingsBetween(from, to){ // from exklusiv, to exklusiv
   }
   DEBTS.forEach(d=>{ if(d.due && d.due>from && d.due<to && SIM[d.id].remaining>0.005) items.push({date:d.due,name:d.name+' (fällig)',amount:-SIM[d.id].remaining}); });
   // schon erfasste Einzelbuchungen mit Datum in der Zukunft
-  EXP.forEach(e=>{ if(e.date>from && e.date<to) items.push({date:e.date,name:e.note||e.sub||CAT[e.cat]?.name||'Ausgabe',amount:-e.amount,acc:accOf(e,'out')}); });
-  INC.forEach(e=>{ if(e.date>from && e.date<to) items.push({date:e.date,name:e.note||e.source||'Einnahme',amount:e.amount,acc:accOf(e,'in')}); });
+  const dn = id => S.debts[id]?.name || 'Schulden';
+  REFI.pairs.forEach(({inc,exp})=>{ if(inc.date>from && inc.date<to) items.push({date:inc.date,name:`Umschuldung ${dn(inc.debtId)} → ${dn(exp.debtId)}`,amount:0,refi:inc.amount}); });
+  EXP.forEach(e=>{ if(REFI.ids.has(e.id)) return; if(e.date>from && e.date<to) items.push({date:e.date,name:e.note||e.sub||CAT[e.cat]?.name||'Ausgabe',amount:-e.amount,acc:accOf(e,'out')}); });
+  INC.forEach(e=>{ if(REFI.ids.has(e.id)) return; if(e.date>from && e.date<to) items.push({date:e.date,name:e.note||e.source||'Einnahme',amount:e.amount,acc:accOf(e,'in')}); });
   return items.sort((a,b)=>a.date.localeCompare(b.date));
 }
 function renderFree(show){
@@ -460,6 +483,10 @@ function renderFree(show){
     <div class="sub" style="margin-top:8px;font-size:13px">Gerechnet mit deinen Kontoständen inkl. allem, was du seitdem erfasst hast, plus festen Buchungen mit Tag und fälligen Schulden. Was du ab heute ausgibst, ist hier noch nicht abgezogen.</div>`;
   if($('#freetoggle')) $('#freetoggle').onclick=()=>$('#freelist').classList.toggle('hidden');
 }
+const MS=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const bookRow = (x, after) => `<div class="brow"><span class="dte"><b>${+x.date.slice(8,10)}</b><small>${MS[+x.date.slice(5,7)-1]}</small></span>
+  <span class="bt"><span class="nm">${esc(x.name)}</span>${x.acc?`<small>${esc(x.acc)}</small>`:''}</span>
+  <span class="ba">${x.refi?`<span class="muted">${fmt(x.refi)}</span><small>umgeschuldet</small>`:`<b class="${x.amount>=0?'pos':''}">${x.amount>=0?'+':'−'}${fmt(Math.abs(x.amount))}</b>${after!=null?`<small>danach ${fmt(after)}</small>`:''}`}</span></div>`;
 function warnings(){
   const t=today(), w=[];
   DEBTS.forEach(d=>{ if(SIM[d.id].remaining>0.005 && !d.due && !(+d.rate && d.day)) w.push({txt:`${d.name}: kein Fälligkeitsdatum und keine Rate, wird nicht eingeplant`, fn:()=>editDebt(d.id)}); });
@@ -471,7 +498,7 @@ function warnings(){
 function renderHome(){
   const t=today(), pd=nextPayday();
   const days=Math.max(1,Math.round((new Date(pd.date+'T12:00')-new Date(t+'T12:00'))/864e5));
-  const lbl = pd.name ? `Frei bis ${esc(pd.name)} am ${dDE(pd.date).slice(0,6)}` : 'Frei bis Monatsende';
+  const lbl = pd.name ? `Frei bis ${esc(pd.name)} · ${dDE(pd.date).slice(0,6)}` : 'Frei bis Monatsende';
   const rows=balRows(t), now=rows.reduce((a,r)=>a+r.est,0);
   const items=bookingsBetween(t, pd.date);
   const inSum=items.filter(x=>x.amount>0).reduce((a,x)=>a+x.amount,0), outSum=items.filter(x=>x.amount<0).reduce((a,x)=>a+x.amount,0);
@@ -479,30 +506,32 @@ function renderHome(){
   let html = BALS.length ? `<div class="card hero" id="h-hero">
       <div class="lbl">${lbl}</div>
       <div class="amt ${free>=0?'':'neg'}">${fmt(free)}</div>
-      <div class="per">${free>=0?`<b>${fmt(free/days)}</b> pro Tag`:'fehlt bis dahin'} <span class="muted">· noch ${days} Tage</span></div>
-      <div class="split"><div><small>Jetzt auf Konten</small><b>${fmt(now)}</b></div><div><small>Kommt noch rein</small><b class="pos">+${fmt(inSum)}</b></div><div><small>Geht noch raus</small><b>${outSum?'−'+fmt(-outSum):fmt(0)}</b></div></div>
-      ${items.length?'<button class="link" id="h-items">Alle Buchungen bis dahin</button>':''}
+      <div class="per"><span class="pill">${free>=0?`${fmt(free/days)} pro Tag`:'fehlt bis dahin'}</span><span class="days">noch ${days} Tage</span></div>
+      <div class="split"><div><small>Auf Konten</small><b>${fmt(now)}</b></div><div><small>Kommt rein</small><b class="pos">+${fmt(inSum)}</b></div><div><small>Geht raus</small><b>${outSum?'−'+fmt(-outSum):fmt(0)}</b></div></div>
+      ${items.length?'<button class="hlink" id="h-items">Alle Buchungen bis dahin ›</button>':''}
     </div>`
     : `<div class="card hero"><div class="lbl">${lbl}</div><div class="sub" style="margin-top:8px">Trag deine Kontostände und dein Bargeld ein, dann siehst du hier, was wirklich frei ist.</div><button class="btn" id="h-firstbal">Kontostand eintragen</button></div>`;
   if(rows.length){
-    html += `<h2>Konten</h2><div class="card" style="padding:0 16px">${rows.map(r=>`<div class="catline chev" data-acc="${esc(r.account)}"><div class="h"><span>${esc(r.account)}</span><b class="${r.est<0?'neg':''}">${fmt(r.est)}</b></div></div>`).join('')}
-      ${rows.length>1?`<div class="catline"><div class="h"><span class="muted">Gesamt</span><b style="font-weight:600">${fmt(now)}</b></div></div>`:''}</div>
+    const accIc = a => /bar/i.test(a) ? 'M3 7h18v10H3zM12 12m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0' : 'M3 6h18v12H3zM3 10h18M7 15h3';
+    html += `<h2>Konten</h2><div class="card list">${rows.map((r,i)=>`<div class="catline chev" data-acc="${esc(r.account)}"><div class="h"><span><span class="ic sm" style="--c:${['#6366f1','#0ea5e9','#10b981','#f59e0b','#a855f7'][i%5]}"><svg viewBox="0 0 24 24"><path d="${accIc(r.account)}"/></svg></span>${esc(r.account)}</span><b class="${r.est<0?'neg':''}">${fmt(r.est)}</b></div></div>`).join('')}
+      ${rows.length>1?`<div class="catline total"><div class="h"><span>Gesamt</span><b>${fmt(now)}</b></div></div>`:''}</div>
       <button class="btn sec" id="h-abgleich">Kontostand abgleichen</button>`;
   }
   const next=bookingsBetween(t, addDays(t,45)).slice(0,5);
-  if(next.length) html += `<h2>Nächste Buchungen</h2><div class="card" style="padding:0 16px">${next.map(u=>`<div class="catline"><div class="h"><span><span class="muted" style="width:46px;flex:none">${dDE(u.date).slice(0,6)}</span><span class="nm">${esc(u.name)}</span></span><b class="${u.amount>=0?'pos':''}">${u.amount>=0?'+':'−'}${fmt(Math.abs(u.amount))}</b></div></div>`).join('')}</div>`;
+  if(next.length) html += `<div class="sect"><h2>Nächste Buchungen</h2><button class="link" id="h-more">Alle</button></div><div class="card list">${next.map(u=>bookRow(u)).join('')}</div>`;
   const w=warnings();
-  if(w.length) html += `<h2>Hinweise</h2><div class="card" style="padding:0 16px">${w.map((x,i)=>`<div class="catline warn chev" data-w="${i}"><div class="h"><span>${esc(x.txt)}</span><b></b></div></div>`).join('')}</div>`;
+  if(w.length) html += `<h2>Hinweise</h2><div class="card list">${w.map((x,i)=>`<div class="catline warn chev" data-w="${i}"><div class="h"><span>${esc(x.txt)}</span><b></b></div></div>`).join('')}</div>`;
   const md=monthData(ym(t));
-  html += `<h2>${mLabel(ym(t),true)}</h2><div class="card" style="padding:0 16px" id="h-month">
+  html += `<h2>${mLabel(ym(t),true)}</h2><div class="card list" id="h-month">
     <div class="catline chev"><div class="h"><span>Einnahmen</span><b class="pos">${fmt(md.inc)}</b></div></div>
     <div class="catline chev"><div class="h"><span>Ausgaben</span><b>${fmt(md.total)}</b></div></div>
     <div class="catline chev"><div class="h"><span>Bilanz Monat</span><b class="${md.left>=0?'pos':'neg'}">${fmt(md.left)}</b></div></div></div>`;
   $('#home').innerHTML=html;
   if($('#h-items')) $('#h-items').onclick=()=>{ let run=now;
-    $('#sheet').innerHTML=`<h3>${lbl}</h3><div class="sub">Startet mit ${fmt(now)} auf allen Konten</div><div class="card" style="padding:0 16px;margin-top:14px">${items.map(x=>{ run+=x.amount; return `<div class="catline"><div class="h"><span><span class="muted" style="width:46px;flex:none">${dDE(x.date).slice(0,6)}</span><span class="nm">${esc(x.name)}</span></span><b class="${x.amount>=0?'pos':''}">${x.amount>=0?'+':'−'}${fmt(Math.abs(x.amount))}</b></div><div class="sub" style="font-size:13px;text-align:right">danach ${fmt(run)}</div></div>`; }).join('')}</div>
-      <div class="sub" style="margin:10px 4px 0;font-size:13px">Was du ab heute zusätzlich ausgibst, ist hier noch nicht abgezogen.</div><button class="btn sec" id="x-close">Fertig</button>`;
-    $('#x-close').onclick=closeSheet; openSheet(); };
+    $('#sheet').innerHTML=`<h3>Bis ${pd.name?'zum Gehalt am ':''}${dDE(pd.date).slice(0,6)}</h3><div class="sub">Start: ${fmt(now)} auf allen Konten · am Ende frei: ${fmt(free)}</div><div class="card list" style="margin-top:14px">${items.map(x=>{ run+=x.amount; return bookRow(x,run); }).join('')}</div>
+      <div class="sub" style="margin:12px 4px 0;font-size:13px">Was du ab heute zusätzlich ausgibst, ist hier noch nicht abgezogen.</div>`;
+    openSheet(); };
+  if($('#h-more')) $('#h-more').onclick=()=>goFin('acc');
   if($('#h-firstbal')) $('#h-firstbal').onclick=()=>editBalance();
   if($('#h-abgleich')) $('#h-abgleich').onclick=()=>editBalance(rows[0]?.account);
   document.querySelectorAll('#home .catline[data-acc]').forEach(el=>el.onclick=()=>editBalance(el.dataset.acc));
@@ -520,8 +549,8 @@ function renderFix(){
     <button class="btn sec" id="newbal">Kontostand abgleichen oder neues Konto</button>`;
   $('#newbal').onclick=()=>editBalance();
   document.querySelectorAll('#balance .catline[data-acc]').forEach(el=>el.onclick=()=>editBalance(el.dataset.acc));
-  const up = bookingsBetween(t, addDays(t,45)).slice(0,8);
-  $('#upcoming').innerHTML = up.length ? `<div class="card" style="padding:6px 16px">${up.map(u=>`<div class="catline"><div class="h"><span>${dDE(u.date).slice(0,6)} ${esc(u.name)}${u.acc?` <small class="muted">${esc(u.acc)}</small>`:''}</span><b class="${u.amount>=0?'pos':''}">${u.amount>=0?'+':''}${fmt(u.amount)}</b></div></div>`).join('')}</div>` : '<div class="empty" style="padding:12px">Trag bei Fixkosten und festen Einnahmen einen Tag ein, dann siehst du hier die nächsten Buchungen.</div>';
+  const up = bookingsBetween(t, addDays(t,45)).slice(0,12);
+  $('#upcoming').innerHTML = up.length ? `<div class="card list">${up.map(u=>bookRow(u)).join('')}</div>` : '<div class="empty" style="padding:12px">Trag bei Fixkosten und festen Einnahmen einen Tag ein, dann siehst du hier die nächsten Buchungen.</div>';
   const totalOpen = DEBTS.reduce((a,d)=>a+SIM[d.id].remaining,0);
   $('#debtsum').textContent = DEBTS.length ? 'offen gesamt '+fmt(totalOpen) : '';
   const soon = addDays(today(),14);
@@ -536,8 +565,8 @@ function renderFix(){
   document.querySelectorAll('#debts .debt').forEach(el=>el.onclick=()=>editDebt(el.dataset.id));
   const byDay = arr => arr.slice().sort((a,b)=>(+a.day||99)-(+b.day||99));
   const list=(arr,empty,cls)=>{ const sum=arr.filter(f=>f.active!==false).reduce((a,f)=>a+(+f.amount||0),0);
-    return arr.length ? `<div class="card" style="padding:6px 16px">${byDay(arr).map(f=>`<div class="catline" data-id="${esc(f.id)}"><div class="h"><span><i class="dot" style="background:${f.kind==='income'?'var(--pos)':(CAT[f.cat]?.color||'#999')}"></i>${esc(f.name)}</span><b class="${cls}">${fmt(f.amount)}</b></div>
-      <div class="sub" style="font-size:13px;margin-left:18px">${[f.day?'am '+f.day+'.':'ohne Tag (zählt nicht im Kontostand)', f.account||'', f.end?'bis '+mLabel(f.end)+' '+f.end.slice(2,4):''].filter(Boolean).join(' · ')}</div></div>`).join('')}<div class="catline"><div class="h"><span class="muted">Summe pro Monat</span><b class="${cls}">${fmt(sum)}</b></div></div></div>` : `<div class="empty">${empty}</div>`; };
+    return arr.length ? `<div class="card" style="padding:6px 16px">${byDay(arr).map(f=>`<div class="catline" data-id="${esc(f.id)}"><div class="h"><span>${f.kind==='income'?ico('in','#10b981','sm'):ico(f.cat,null,'sm')}<span class="nm">${esc(f.name)}</span></span><b class="${cls}">${fmt(f.amount)}</b></div>
+      <div class="sub" style="font-size:13px;margin-left:44px">${[f.day?'am '+f.day+'.':'ohne Tag (zählt nicht im Kontostand)', f.account||'', f.end?'bis '+mLabel(f.end)+' '+f.end.slice(2,4):''].filter(Boolean).join(' · ')}</div></div>`).join('')}<div class="catline"><div class="h"><span class="muted">Summe pro Monat</span><b class="${cls}">${fmt(sum)}</b></div></div></div>` : `<div class="empty">${empty}</div>`; };
   $('#fixedin').innerHTML = list(FIXIN,'Noch keine festen Einnahmen. Zum Beispiel Gehalt als Werkstudent.','pos');
   $('#fixed').innerHTML = list(FIX,'Noch keine Fixkosten. Typisch: Miete, Handyvertrag, Fitnessstudio, Streaming, Versicherungen.','');
   document.querySelectorAll('#fixed .catline[data-id]').forEach(el=>el.onclick=()=>editFixed(el.dataset.id,'expense'));
@@ -683,7 +712,7 @@ function renderTrades(){
   $('#tsum').innerHTML = `<span class="${sum>=0?'pos':'neg'}">${fmt(sum)}</span>`;
   $('#tmonth').innerHTML = `<span class="${mon>=0?'pos':'neg'}">${fmt(mon)}</span>`;
   $('#tstock').textContent = fmt(stock);
-  const row = t => { const p=tradeProfit(t); return `<div class="item" data-id="${esc(t.id)}"><span class="dot" style="background:${t.sellDate?(p>=0?'var(--pos)':'var(--danger)'):'var(--muted)'}"></span><div class="t"><b>${esc(t.item||'Artikel')}</b><span>${t.type==='comm'?`Provision ${dDE(t.sellDate)}${t.sellAccount?' · '+esc(t.sellAccount):''}`:t.sellDate?`verkauft ${dDE(t.sellDate)} für ${fmt(t.sellPrice)}${t.sellAccount?' · '+esc(t.sellAccount):''}`:`gekauft ${dDE(t.buyDate)} für ${fmt((+t.buyPrice||0)+(+t.buyCosts||0))}${t.buyAccount?' · '+esc(t.buyAccount):''}`}</span></div><div class="a ${t.sellDate?(p>=0?'pos':'neg'):''}">${t.sellDate?(p>=0?'+':'')+fmt(p):fmt(+t.buyPrice||0)}</div></div>`; };
+  const row = t => { const p=tradeProfit(t); return `<div class="item" data-id="${esc(t.id)}">${ico('trade', t.sellDate?(p>=0?'#10b981':'#f43f5e'):'#64748b')}<div class="t"><b>${esc(t.item||'Artikel')}</b><span>${t.type==='comm'?`Provision ${dDE(t.sellDate)}${t.sellAccount?' · '+esc(t.sellAccount):''}`:t.sellDate?`verkauft ${dDE(t.sellDate)} für ${fmt(t.sellPrice)}${t.sellAccount?' · '+esc(t.sellAccount):''}`:`gekauft ${dDE(t.buyDate)} für ${fmt((+t.buyPrice||0)+(+t.buyCosts||0))}${t.buyAccount?' · '+esc(t.buyAccount):''}`}</span></div><div class="a ${t.sellDate?(p>=0?'pos':'neg'):''}">${t.sellDate?(p>=0?'+':'')+fmt(p):fmt(+t.buyPrice||0)}</div></div>`; };
   $('#tradesopen').innerHTML = open.length ? open.map(row).join('') : '<div class="empty">Nichts im Lager.</div>';
   $('#tradesdone').innerHTML = sold.length ? sold.map(row).join('') : '<div class="empty">Noch nichts verkauft.</div>';
   document.querySelectorAll('#v-trade .item').forEach(el=>el.onclick=()=>editTrade(el.dataset.id));
@@ -781,7 +810,7 @@ function renderStats(){
   const list=Object.entries(by).sort((a,b)=>b[1].sum-a[1].sum);
   $('#bycat').innerHTML = list.length ? list.map(([cid,c])=>{ const cc=CAT[cid]||{name:cid,color:'#999'}; const pct=d.total?c.sum/d.total*100:0;
     const subs=Object.entries(c.subs).sort((a,b)=>b[1]-a[1]);
-    return `<div class="catline"><div class="h"><span><i class="dot" style="background:${cc.color}"></i>${esc(cc.name)}</span><b>${fmt(c.sum)} <small class="muted">${Math.round(pct)} %</small></b></div>
+    return `<div class="catline"><div class="h"><span>${ico(cid,cc.color,'sm')}${esc(cc.name)}</span><b>${fmt(c.sum)} <small class="muted">${Math.round(pct)} %</small></b></div>
       <div class="bar"><i style="width:${pct}%;background:${cc.color}"></i></div>
       ${subs.length>1||(subs[0]&&subs[0][0]!=='Ohne')?`<div class="subs hidden">${subs.map(([s,v])=>`<div><span>${esc(s)}</span><span>${fmt(v)}</span></div>`).join('')}</div>`:''}</div>`; }).join('')
     : '<div class="empty">Keine Ausgaben in diesem Monat.</div>';
@@ -791,13 +820,24 @@ function renderStats(){
   d.fxin.forEach(x=>{ const k=x.name+' (fest)'; ib[k]=(ib[k]||0)+x.amount; });
   if(d.tp) ib['Handel (Gewinn)']=d.tp;
   const il=Object.entries(ib).sort((a,b)=>b[1]-a[1]);
-  $('#byinc').innerHTML = il.length ? il.map(([k,v])=>`<div class="catline"><div class="h"><span><i class="dot" style="background:var(--pos)"></i>${esc(k)}</span><b class="${v>=0?'pos':'neg'}">${fmt(v)}</b></div></div>`).join('') : '<div class="empty">Keine Einnahmen in diesem Monat.</div>';
+  $('#byinc').innerHTML = il.length ? il.map(([k,v])=>`<div class="catline"><div class="h"><span>${ico('in','#10b981','sm')}${esc(k)}</span><b class="${v>=0?'pos':'neg'}">${fmt(v)}</b></div></div>`).join('') : '<div class="empty">Keine Einnahmen in diesem Monat.</div>';
 }
 $('#export').onclick=exportCsv;
 
 /* ---------- Sheet-Dialog ---------- */
-function openSheet(){ $('#ov').classList.add('show'); }
-function closeSheet(){ $('#ov').classList.remove('show'); }
+function openSheet(){
+  const sh=$('#sheet');
+  if(!sh.querySelector('.sheet-top')) sh.insertAdjacentHTML('afterbegin','<div class="sheet-top"><span class="grab"></span><button class="sheet-x" type="button" aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div>');
+  sh.querySelector('.sheet-x').onclick=closeSheet;
+  sh.style.transform=''; sh.scrollTop=0; $('#ov').classList.add('show');
+}
+function closeSheet(){ $('#ov').classList.remove('show'); $('#sheet').style.transform=''; }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSheet(); });
+(()=>{ const sh=$('#sheet'); let y0=null, dy=0;
+  sh.addEventListener('touchstart',e=>{ y0 = sh.scrollTop<=0 ? e.touches[0].clientY : null; dy=0; },{passive:true});
+  sh.addEventListener('touchmove',e=>{ if(y0==null) return; dy=e.touches[0].clientY-y0; if(dy>0){ sh.style.transition='none'; sh.style.transform=`translateY(${dy}px)`; } },{passive:true});
+  sh.addEventListener('touchend',()=>{ if(y0==null) return; sh.style.transition=''; if(dy>110) closeSheet(); else sh.style.transform=''; y0=null; });
+})();
 $('#ov').addEventListener('click',e=>{ if(e.target.id==='ov') closeSheet(); });
 
 /* ---------- Render & Start ---------- */

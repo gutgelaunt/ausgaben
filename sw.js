@@ -1,5 +1,5 @@
 // Offline-Cache für die App-Dateien. Bei Änderungen an der App VERSION hochzählen.
-const VERSION = 'ausgaben-v13';
+const VERSION = 'ausgaben-v14';
 const FILES = ['./', './index.html', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
