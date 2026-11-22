@@ -384,9 +384,46 @@ function upcoming(n){
   });
   return items.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,n);
 }
+const balRows = t => BALS.map(b=>{ const mv=movements(b,t); return {...b, mv, delta:mv.total, est:(+b.amount||0)+mv.total}; });
+// Stichtag: nächster Eingang der größten festen Einnahme mit Tag (meist das Gehalt), sonst Monatsende
+function nextPayday(){
+  const t=today(), m0=ym(t);
+  const main = FIXIN.filter(f=>f.day && f.active!==false).sort((a,b)=>(+b.amount||0)-(+a.amount||0))[0];
+  if(main) for(const m of [m0,addM(m0,1),addM(m0,2)]){ if(fixActive(main,m)){ const d=bookDate(main,m); if(d>t) return {date:d,name:main.name}; } }
+  return {date:addDays(m0+'-'+String(daysIn(m0)).padStart(2,'0'),1), name:null};
+}
+function bookingsBetween(from, to){ // from exklusiv, to exklusiv
+  const items=[]; let m=ym(from);
+  for(let k=0;k<4 && m<=ym(to);k++,m=addM(m,1)){
+    FIXIN.forEach(f=>{ if(fixActive(f,m) && f.day){ const d=bookDate(f,m); if(d>from && d<to) items.push({date:d,name:f.name,amount:+f.amount||0,acc:f.account}); } });
+    FIX.forEach(f=>{ if(fixActive(f,m) && f.day){ const d=bookDate(f,m); if(d>from && d<to) items.push({date:d,name:f.name,amount:-(+f.amount||0),acc:f.account}); } });
+  }
+  DEBTS.forEach(d=>{ if(d.due && d.due>from && d.due<to && SIM[d.id].remaining>0.005) items.push({date:d.due,name:d.name+' (fällig)',amount:-SIM[d.id].remaining}); });
+  return items.sort((a,b)=>a.date.localeCompare(b.date));
+}
+function renderFree(show){
+  const el=$('#free'); if(!show){ el.classList.add('hidden'); return; } el.classList.remove('hidden');
+  const t=today(), pd=nextPayday();
+  const days=Math.max(1,Math.round((new Date(pd.date+'T12:00')-new Date(t+'T12:00'))/864e5));
+  const lbl = pd.name ? `bis ${esc(pd.name)} am ${dDE(pd.date).slice(0,6)}` : 'bis Monatsende';
+  if(!BALS.length){ el.innerHTML=`<div class="sub"><b>Was ist wirklich frei ${lbl}?</b><br>Trag unter Finanzen deine aktuellen Kontostände und dein Bargeld ein. Dann rechnet die App hier mit deinem echten Geld.</div>`; return; }
+  const now = balRows(t).reduce((a,r)=>a+r.est,0);
+  const items = bookingsBetween(t, pd.date);
+  const inSum = items.filter(x=>x.amount>0).reduce((a,x)=>a+x.amount,0), outSum = items.filter(x=>x.amount<0).reduce((a,x)=>a+x.amount,0);
+  const free = now+inSum+outSum;
+  let run=now;
+  el.innerHTML = `<div class="sub" style="margin-bottom:6px">Frei ${lbl} (${days} Tage)</div>
+    <div class="h" style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:26px" class="${free>=0?'pos':'neg'}">${fmt(free)}</b><span>${free>=0?fmt(free/days)+' pro Tag':'fehlt bis dahin'}</span></div>
+    <div class="catline"><div class="h"><span>Geld jetzt auf allen Konten</span><b>${fmt(now)}</b></div></div>
+    <div class="catline"><div class="h"><span>kommt noch rein</span><b class="pos">+${fmt(inSum)}</b></div></div>
+    <div class="catline"><div class="h"><span>geht noch raus</span><b>${outSum?'−'+fmt(-outSum):fmt(0)}</b></div></div>
+    ${items.length?`<button class="btn sec small" id="freetoggle" style="margin-top:8px">Buchungen bis dahin zeigen</button><div id="freelist" class="hidden" style="margin-top:6px">${items.map(x=>{ run+=x.amount; return `<div class="catline"><div class="h"><span>${dDE(x.date).slice(0,6)} ${esc(x.name)}${x.acc?` <small class="muted">${esc(x.acc)}</small>`:''}</span><b class="${x.amount>=0?'pos':''}">${x.amount>=0?'+':'−'}${fmt(Math.abs(x.amount))}</b></div><div class="sub" style="font-size:12px;text-align:right">danach ${fmt(run)}</div></div>`; }).join('')}</div>`:''}
+    <div class="sub" style="margin-top:8px;font-size:13px">Gerechnet mit deinen Kontoständen inkl. allem, was du seitdem erfasst hast, plus festen Buchungen mit Tag und fälligen Schulden. Was du ab heute ausgibst, ist hier noch nicht abgezogen.</div>`;
+  if($('#freetoggle')) $('#freetoggle').onclick=()=>$('#freelist').classList.toggle('hidden');
+}
 function renderFix(){
   const t=today();
-  const rows = BALS.map(b=>{ const mv=movements(b,t); return {...b, mv, delta:mv.total, est:(+b.amount||0)+mv.total}; });
+  const rows = balRows(t);
   const totalEst = rows.reduce((a,r)=>a+r.est,0);
   $('#balance').innerHTML = `<div class="card" style="padding:6px 16px">${rows.length ? rows.map(r=>`<div class="catline" data-acc="${esc(r.account)}"><div class="h"><span>${esc(r.account)}</span><b>${fmt(r.est)}</b></div>
       <div class="sub" style="font-size:13px">Eingetragen am ${dDE(r.date)}: ${fmt(r.amount)}${r.mv.parts.length?' · seitdem '+r.mv.parts.map(([l,v])=>`${l} <span class="${v>=0?'pos':'neg'}">${v>=0?'+':'−'}${fmt(Math.abs(v))}</span>`).join(', '):''}</div></div>`).join('')
@@ -554,11 +591,11 @@ function renderStats(){
   const dim = daysIn(m);
   if(m===nowM){
     const day = +today().slice(8,10), rest = dim-day+1;
-    const avail = d.inc - d.f - d.v;
-    $('#kday').innerHTML = `Bisher ${fmt(d.v/day)} pro Tag ausgegeben (variabel). `+(d.inc?`Noch verfügbar bis Monatsende: <b class="${avail>=0?'pos':'neg'}">${fmt(avail)}</b>, also <b>${fmt(avail/rest)}</b> pro Tag für die restlichen ${rest} Tage.`:'Trag Einnahmen ein, dann siehst du, wie viel pro Tag übrig bleibt.');
+    $('#kday').innerHTML = `Bisher ${fmt(d.v/day)} pro Tag ausgegeben (variabel). „Bilanz Monat“ heißt: alle Einnahmen minus alle Ausgaben, feste Buchungen schon komplett mitgerechnet, auch wenn sie erst später kommen.`;
   } else if(m<nowM){
     $('#kday').innerHTML = `Ø ${fmt(d.v/dim)} pro Tag ausgegeben (variabel), übrig ${fmt(d.left/dim)} pro Tag.`;
   } else $('#kday').textContent='';
+  renderFree(m===nowM);
   const prev=[1,2,3].map(i=>monthData(addM(m,-i))).filter(x=>x.vars.length);
   if(prev.length){ const avg=prev.reduce((a,x)=>a+x.v,0)/prev.length; const diff=d.v-avg;
     $('#kcompare').textContent = `Variable Ausgaben ${diff>=0?fmt(diff)+' über':fmt(-diff)+' unter'} dem Schnitt der letzten ${prev.length} Monat${prev.length>1?'e':''} (${fmt(avg)}).`;
