@@ -42,7 +42,8 @@ TABLE_NAMES.forEach(t=>{ if(!S[t]) S[t]={}; });
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast('Lokales Speichern fehlgeschlagen'); } }
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 
-let EXP=[], INC=[], FIX=[], FIXIN=[], DEBTS=[], TRADES=[], BAL=null, SIM={};
+let EXP=[], INC=[], FIX=[], FIXIN=[], DEBTS=[], TRADES=[], BAL=null, BALS=[], SIM={};
+const DEFAULT_ACCOUNTS=['Gehaltskonto','Alltagskonto','Bargeld'];
 const live = o => Object.values(o).filter(x=>!x.deleted);
 function rebuild(){
   EXP = live(S.expenses).map(e=>({...e,amount:+e.amount||0})).sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.updatedAt||0)-(a.updatedAt||0));
@@ -51,7 +52,9 @@ function rebuild(){
   FIX = fx.filter(f=>f.kind!=='income'); FIXIN = fx.filter(f=>f.kind==='income');
   DEBTS = live(S.debts).sort((a,b)=>String(a.due||'9999').localeCompare(String(b.due||'9999')));
   TRADES = live(S.trades).sort((a,b)=>String(b.sellDate||b.buyDate).localeCompare(String(a.sellDate||a.buyDate)));
-  BAL = live(S.balances).sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.updatedAt||0)-(a.updatedAt||0))[0]||null;
+  const bl = live(S.balances).sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.updatedAt||0)-(a.updatedAt||0));
+  BAL = bl[0]||null;
+  const seen={}; BALS=[]; bl.forEach(b=>{ const k=b.account||'Konto'; if(!seen[k]){ seen[k]=1; BALS.push({...b,account:k}); } });
   SIM = {}; DEBTS.forEach(d=>SIM[d.id]=debtSim(d));
 }
 function put(table, rec){
@@ -303,22 +306,44 @@ function monthData(m){
 }
 
 /* ---------- Finanzen ---------- */
-function balanceEstimate(){
-  if(!BAL) return null;
-  const since = BAL.date;
-  const plus = INC.filter(e=>e.date>since).reduce((a,e)=>a+e.amount,0)
-    + TRADES.filter(t=>t.sellDate && t.sellDate>since).reduce((a,t)=>a+(+t.sellPrice||0)-(+t.fees||0),0);
-  const minus = EXP.filter(e=>e.date>since).reduce((a,e)=>a+e.amount,0)
-    + TRADES.filter(t=>t.buyDate && t.buyDate>since).reduce((a,t)=>a+(+t.buyPrice||0)+(+t.buyCosts||0),0);
-  return {plus, minus, est:(+BAL.amount||0)+plus-minus};
+const accounts = () => { const a=[...DEFAULT_ACCOUNTS]; [...BALS.map(b=>b.account), ...live(S.fixed).map(f=>f.account)].forEach(x=>{ if(x && !a.includes(x)) a.push(x); }); return a; };
+const bookDate = (f,m) => m+'-'+String(Math.min(+f.day||1, daysIn(m))).padStart(2,'0');
+const fixActive = (f,m) => f.active!==false && !(f.start && m<f.start) && !(f.end && m>f.end);
+// feste Buchungen (Einnahmen +, Kosten −) eines Kontos zwischen zwei Daten (from exklusiv, to inklusiv)
+function fixedBookings(from, to, account){
+  const out=[]; if(!from || to<=from) return out;
+  let m=ym(from); const last=ym(to);
+  for(let k=0;k<36 && m<=last;k++,m=addM(m,1)){
+    [...FIXIN.map(f=>({f,sign:1})), ...FIX.map(f=>({f,sign:-1}))].forEach(({f,sign})=>{
+      if(!fixActive(f,m) || !f.day) return;
+      if(account && (f.account||'')!==account) return;
+      const d=bookDate(f,m); if(d>from && d<=to) out.push({date:d,name:f.name,amount:sign*(+f.amount||0)});
+    });
+  }
+  return out;
+}
+function upcoming(n){
+  const t=today(), m0=ym(t), items=[];
+  [m0, addM(m0,1)].forEach(m=>{
+    FIXIN.forEach(f=>{ if(fixActive(f,m) && f.day){ const d=bookDate(f,m); if(d>=t) items.push({date:d,name:f.name,amount:+f.amount||0,acc:f.account}); } });
+    FIX.forEach(f=>{ if(fixActive(f,m) && f.day){ const d=bookDate(f,m); if(d>=t) items.push({date:d,name:f.name,amount:-(+f.amount||0),acc:f.account}); } });
+    DEBTS.forEach(d=>{ if(d.due && ym(d.due)===m && d.due>=t && SIM[d.id].remaining>0.005) items.push({date:d.due,name:d.name+' (fällig)',amount:-SIM[d.id].remaining}); });
+  });
+  return items.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,n);
 }
 function renderFix(){
-  const be = balanceEstimate();
-  $('#balance').innerHTML = BAL ? `<div class="card" id="balcard" style="cursor:pointer"><div class="sub">Kontostand am ${dDE(BAL.date)}</div><div class="big">${fmt(BAL.amount)}</div>
-      ${be.plus||be.minus?`<div class="sub" style="margin-top:6px">Seitdem erfasst: <span class="pos">+${fmt(be.plus)}</span> / <span class="neg">−${fmt(be.minus)}</span>, geschätzt jetzt <b>${fmt(be.est)}</b> (ohne Fixkosten-Abbuchungen)</div>`:''}
-      <button class="btn sec" id="newbal">Neuen Kontostand eintragen</button></div>`
-    : `<div class="card"><div class="empty" style="padding:8px">Noch kein Kontostand eingetragen.</div><button class="btn sec" id="newbal">Kontostand eintragen</button></div>`;
-  $('#newbal').onclick=e=>{ e.stopPropagation(); editBalance(); };
+  const t=today();
+  const rows = BALS.map(b=>{ const bk=fixedBookings(b.date,t,b.account); const delta=bk.reduce((a,x)=>a+x.amount,0); return {...b, delta, est:(+b.amount||0)+delta}; });
+  const totalEst = rows.reduce((a,r)=>a+r.est,0);
+  $('#balance').innerHTML = `<div class="card" style="padding:6px 16px">${rows.length ? rows.map(r=>`<div class="catline" data-acc="${esc(r.account)}"><div class="h"><span>${esc(r.account)}</span><b>${fmt(r.est)}</b></div>
+      <div class="sub" style="font-size:13px">Stand ${dDE(r.date)}: ${fmt(r.amount)}${r.delta?` · seitdem feste Buchungen <span class="${r.delta>=0?'pos':'neg'}">${r.delta>=0?'+':'−'}${fmt(Math.abs(r.delta))}</span>`:''}</div></div>`).join('')
+      + (rows.length>1?`<div class="catline"><div class="h"><span class="muted">Gesamt</span><b>${fmt(totalEst)}</b></div></div>`:'')
+      : '<div class="empty" style="padding:12px">Noch kein Kontostand eingetragen.</div>'}</div>
+    <button class="btn sec" id="newbal">Kontostand oder Bargeld eintragen</button>`;
+  $('#newbal').onclick=()=>editBalance();
+  document.querySelectorAll('#balance .catline[data-acc]').forEach(el=>el.onclick=()=>editBalance(el.dataset.acc));
+  const up = upcoming(6);
+  $('#upcoming').innerHTML = up.length ? `<div class="card" style="padding:6px 16px">${up.map(u=>`<div class="catline"><div class="h"><span>${dDE(u.date).slice(0,6)} ${esc(u.name)}${u.acc?` <small class="muted">${esc(u.acc)}</small>`:''}</span><b class="${u.amount>=0?'pos':''}">${u.amount>=0?'+':''}${fmt(u.amount)}</b></div></div>`).join('')}</div>` : '<div class="empty" style="padding:12px">Trag bei Fixkosten und festen Einnahmen einen Tag ein, dann siehst du hier die nächsten Buchungen.</div>';
   const totalOpen = DEBTS.reduce((a,d)=>a+SIM[d.id].remaining,0);
   $('#debtsum').textContent = DEBTS.length ? 'offen gesamt '+fmt(totalOpen) : '';
   const soon = addDays(today(),14);
@@ -331,8 +356,10 @@ function renderFix(){
       <div class="bar"><i style="width:${pct}%;background:var(--accent)"></i></div>
       <div class="sub" style="margin-top:8px">${dueTxt}${dueTxt&&bits?' · ':''}${bits}</div>${d.note?`<div class="sub" style="margin-top:4px">${esc(d.note)}</div>`:''}</div>`; }).join('') : '<div class="empty">Keine Schulden angelegt.</div>';
   document.querySelectorAll('#debts .debt').forEach(el=>el.onclick=()=>editDebt(el.dataset.id));
+  const byDay = arr => arr.slice().sort((a,b)=>(+a.day||99)-(+b.day||99));
   const list=(arr,empty,cls)=>{ const sum=arr.filter(f=>f.active!==false).reduce((a,f)=>a+(+f.amount||0),0);
-    return arr.length ? `<div class="card" style="padding:6px 16px">${arr.map(f=>`<div class="catline" data-id="${esc(f.id)}"><div class="h"><span><i class="dot" style="background:${f.kind==='income'?'var(--pos)':(CAT[f.cat]?.color||'#999')}"></i>${esc(f.name)}${f.end?` <small class="muted">bis ${mLabel(f.end)} ${f.end.slice(2,4)}</small>`:''}</span><b class="${cls}">${fmt(f.amount)}</b></div></div>`).join('')}<div class="catline"><div class="h"><span class="muted">Summe pro Monat</span><b class="${cls}">${fmt(sum)}</b></div></div></div>` : `<div class="empty">${empty}</div>`; };
+    return arr.length ? `<div class="card" style="padding:6px 16px">${byDay(arr).map(f=>`<div class="catline" data-id="${esc(f.id)}"><div class="h"><span><i class="dot" style="background:${f.kind==='income'?'var(--pos)':(CAT[f.cat]?.color||'#999')}"></i>${esc(f.name)}</span><b class="${cls}">${fmt(f.amount)}</b></div>
+      <div class="sub" style="font-size:13px;margin-left:18px">${[f.day?'am '+f.day+'.':'ohne Tag', f.account||'', f.end?'bis '+mLabel(f.end)+' '+f.end.slice(2,4):''].filter(Boolean).join(' · ')}</div></div>`).join('')}<div class="catline"><div class="h"><span class="muted">Summe pro Monat</span><b class="${cls}">${fmt(sum)}</b></div></div></div>` : `<div class="empty">${empty}</div>`; };
   $('#fixedin').innerHTML = list(FIXIN,'Noch keine festen Einnahmen. Zum Beispiel Gehalt als Werkstudent.','pos');
   $('#fixed').innerHTML = list(FIX,'Noch keine Fixkosten. Typisch: Miete, Handyvertrag, Fitnessstudio, Streaming, Versicherungen.','');
   document.querySelectorAll('#fixed .catline[data-id]').forEach(el=>el.onclick=()=>editFixed(el.dataset.id,'expense'));
@@ -343,36 +370,49 @@ $('#addfix').onclick=()=>editFixed(null,'expense');
 $('#addfixin').onclick=()=>editFixed(null,'income');
 $('#adddebt').onclick=()=>editDebt(null);
 
-function editBalance(){
-  $('#sheet').innerHTML=`<h3>Kontostand eintragen</h3>
+const accountField = (id, val) => `<label class="l">Konto</label><select id="${id}">${accounts().map(a=>`<option ${a===val?'selected':''}>${esc(a)}</option>`).join('')}<option value="__new">Neues Konto …</option></select><input type="text" id="${id}-new" class="hidden" placeholder="Name des Kontos, z. B. Sparkonto" style="margin-top:8px">`;
+const wireAccount = id => { $('#'+id).onchange=()=>{ $('#'+id+'-new').classList.toggle('hidden', $('#'+id).value!=='__new'); if($('#'+id).value==='__new') $('#'+id+'-new').focus(); }; };
+const readAccount = id => $('#'+id).value==='__new' ? ($('#'+id+'-new').value.trim()||'Konto') : $('#'+id).value;
+
+function editBalance(acc){
+  const hist = acc ? live(S.balances).filter(b=>(b.account||'Konto')===acc).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5) : [];
+  $('#sheet').innerHTML=`<h3>Kontostand oder Bargeld eintragen</h3>
+    ${accountField('b-acc', acc||DEFAULT_ACCOUNTS[0])}
     <label class="l">Aktueller Kontostand (€)</label><input type="text" id="b-amt" inputmode="decimal" placeholder="z. B. 1234,56">
     <label class="l">Stand vom</label><input type="date" id="b-date" value="${today()}">
-    <div class="sub" style="margin-top:10px">Ab diesem Stand rechnet die App mit deinen erfassten Einnahmen und Ausgaben weiter.</div>
+    <div class="sub" style="margin-top:10px">Ab diesem Stand rechnet die App die festen Buchungen dieses Kontos (Gehalt, Fixkosten mit Tag) automatisch weiter.</div>
+    ${hist.length?`<div class="sub" style="margin-top:10px">Letzte Stände: ${hist.map(h=>dDE(h.date)+' '+fmt(h.amount)).join(' · ')}</div>`:''}
     <button class="btn" id="b-save">Speichern</button>${delRow(false)}`;
+  wireAccount('b-acc');
   $('#x-cancel').onclick=closeSheet;
   $('#b-save').onclick=()=>{ const a=parseAmt($('#b-amt').value); if(!isFinite(a)) return toast('Betrag prüfen');
-    put('balances',{id:uid(), amount:a, date:$('#b-date').value||today(), note:''}); closeSheet(); toast('Gespeichert'); };
+    put('balances',{id:uid(), amount:a, date:$('#b-date').value||today(), note:'', account:readAccount('b-acc')}); closeSheet(); toast('Gespeichert'); };
   openSheet(); $('#b-amt').focus();
 }
 
 function editFixed(id, kind){
   const isIn = kind==='income';
-  const f = id ? {...S.fixed[id]} : {id:uid(),name:'',amount:'',cat:isIn?'einnahme':'wohnen',sub:isIn?'':'Miete',start:ym(today()),end:'',active:true,kind};
+  const f = id ? {...S.fixed[id]} : {id:uid(),name:'',amount:'',cat:isIn?'einnahme':'wohnen',sub:isIn?'':'Miete',start:ym(today()),end:'',active:true,kind,day:'',account:DEFAULT_ACCOUNTS[0]};
   let cat=f.cat;
   const draw=()=>{
     const c=CAT[cat];
     $('#sheet').innerHTML=`<h3>${id?(isIn?'Feste Einnahme bearbeiten':'Fixkosten bearbeiten'):(isIn?'Neue feste Einnahme':'Neue Fixkosten')}</h3>
       <label class="l">Name</label><input type="text" id="f-name" value="${esc(f.name)}" placeholder="${isIn?'z. B. Gehalt Westenergie':'z. B. Miete, Handy, Fitnessstudio'}">
-      <label class="l">Betrag pro Monat (€)</label><input type="text" id="f-amt" inputmode="decimal" value="${esc(numIn(f.amount))}">
+      <div class="row"><div><label class="l">Betrag pro Monat (€)</label><input type="text" id="f-amt" inputmode="decimal" value="${esc(numIn(f.amount))}"></div>
+      <div style="flex:0 0 110px"><label class="l">Am Tag</label><input type="number" id="f-day" min="1" max="31" inputmode="numeric" placeholder="z. B. 20" value="${esc(f.day||'')}"></div></div>
+      ${accountField('f-acc', f.account||DEFAULT_ACCOUNTS[0])}
       ${isIn?'':`<label class="l">Kategorie</label><select id="f-cat">${CATS.filter(x=>x.id!=='schulden').map(x=>`<option value="${x.id}" ${x.id===cat?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
       ${c&&c.subs.length?`<label class="l">Unterkategorie</label><select id="f-sub">${c.subs.map(s=>`<option ${s===f.sub?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}`}
       <div class="row"><div><label class="l">Ab Monat</label><input type="month" id="f-start" value="${esc(f.start||'')}"></div><div><label class="l">Bis Monat (optional)</label><input type="month" id="f-end" value="${esc(f.end||'')}"></div></div>
       <button class="btn" id="f-save">Speichern</button>${delRow(!!id)}`;
-    if($('#f-cat')) $('#f-cat').onchange=ev=>{ f.name=$('#f-name').value; f.amount=$('#f-amt').value; f.start=$('#f-start').value; f.end=$('#f-end').value; cat=ev.target.value; f.sub=CAT[cat].subs[0]||''; draw(); };
+    wireAccount('f-acc');
+    const keep=()=>{ f.name=$('#f-name').value; f.amount=$('#f-amt').value; f.day=$('#f-day').value; f.start=$('#f-start').value; f.end=$('#f-end').value; f.account=readAccount('f-acc'); };
+    if($('#f-cat')) $('#f-cat').onchange=ev=>{ keep(); cat=ev.target.value; f.sub=CAT[cat].subs[0]||''; draw(); };
     wireSheet('fixed',id);
-    $('#f-save').onclick=()=>{ const a=parseAmt($('#f-amt').value), n=$('#f-name').value.trim();
+    $('#f-save').onclick=()=>{ const a=parseAmt($('#f-amt').value), n=$('#f-name').value.trim(); const dy=parseInt($('#f-day').value,10);
       if(!n||!(a>0)) return toast('Name und Betrag angeben');
-      put('fixed', {...f, name:n, amount:a, cat, sub:$('#f-sub')?$('#f-sub').value:'', start:$('#f-start').value||ym(today()), end:$('#f-end').value||'', active:true, kind});
+      if($('#f-day').value && !(dy>=1&&dy<=31)) return toast('Tag zwischen 1 und 31');
+      put('fixed', {...f, name:n, amount:a, cat, sub:$('#f-sub')?$('#f-sub').value:'', start:$('#f-start').value||ym(today()), end:$('#f-end').value||'', active:true, kind, day:dy||'', account:readAccount('f-acc')});
       closeSheet(); toast('Gespeichert'); };
   };
   draw(); openSheet();
