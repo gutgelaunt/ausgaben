@@ -338,7 +338,9 @@ function fixedFor(m){
 function fixedIncomeFor(m){
   return FIXIN.filter(f=>f.active!==false && !(f.start && m<f.start) && !(f.end && m>f.end)).map(f=>({name:f.name, amount:+f.amount||0}));
 }
-const tradeProfit = t => (+t.sellPrice||0) - (+t.buyPrice||0) - (+t.buyCosts||0) - (+t.fees||0);
+const tradeProfit = t => (+t.sellPrice||0) - (+t.buyPrice||0) - (+t.buyCosts||0) - (+t.fees||0) - (+t.partnerFee||0);
+// was beim Verkauf wirklich auf dem Konto landet
+const tradeCashIn = t => (+t.sellPrice||0) - (+t.fees||0) - (+t.partnerFee||0) - (!t.buyAccount && t.repay!==false && t.type!=='comm' ? (+t.buyPrice||0) : 0);
 function monthData(m){
   const vars = EXP.filter(e=>ym(e.date)===m);
   const fx = fixedFor(m);
@@ -392,7 +394,7 @@ function movements(b, to){
   const fx = fixedBookings(d0,to,acc).reduce((a,x)=>a+x.amount,0);
   let hd=0; TRADES.forEach(t=>{
     if(t.type!=='comm' && t.buyAccount===acc && t.buyDate && after({date:t.buyDate,updatedAt:t.updatedAt})) hd-=(+t.buyPrice||0)+(+t.buyCosts||0);
-    if(t.sellAccount===acc && t.sellDate && after({date:t.sellDate,updatedAt:t.updatedAt})) hd+=(+t.sellPrice||0)-(+t.fees||0);
+    if(t.sellAccount===acc && t.sellDate && after({date:t.sellDate,updatedAt:t.updatedAt})) hd+=tradeCashIn(t);
   });
   const parts = [['Ausgaben',-out],['Einnahmen',inc],['Umbuchungen',tr],['feste Buchungen',fx],['Handel',hd]].filter(([,v])=>Math.abs(v)>0.004);
   return {total:inc-out+tr+fx+hd, parts};
@@ -622,7 +624,12 @@ function editTrade(id, kind){
     <h2 style="margin-top:16px">Verkauf</h2>
     <div class="row"><div><label class="l">Datum</label><input type="date" id="t-sd" value="${esc(t.sellDate||'')}"></div><div><label class="l">Preis (€)</label><input type="text" id="t-sp" inputmode="decimal" value="${esc(numIn(t.sellPrice))}"></div></div>
     ${accountField('t-sacc', t.sellAccount||'').replace('>Konto<','>Geld eingegangen auf<')}
-    <label class="l">Provision an Mitkäufer und Gebühren (€)</label><input type="text" id="t-fe" inputmode="decimal" value="${+t.fees?esc(numIn(t.fees)):''}" placeholder="wird vom Verkaufsgeld abgezogen">
+    <div id="t-repaybox" class="card" style="padding:10px 14px;margin-top:10px">
+      <label style="display:flex;gap:10px;align-items:center;font-size:15px"><input type="checkbox" id="t-repay" style="width:22px;height:22px" ${t.repay===false?'':'checked'}> <span>Geldgeber zurückzahlen (<b id="t-repayamt"></b>)</span></label>
+      <div class="sub" style="font-size:13px;margin-top:4px">Der Ankauf wurde nicht von deinem Konto bezahlt. Den Ankaufpreis gibst du beim Verkauf zurück.</div>
+    </div>
+    <label class="l">Provision / Danke an Mitkäufer (€)</label><input type="text" id="t-pf" inputmode="decimal" value="${+t.partnerFee?esc(numIn(t.partnerFee)):''}" placeholder="z. B. 20">
+    <label class="l">Gebühren (€, z. B. Versand, Plattform)</label><input type="text" id="t-fe" inputmode="decimal" value="${+t.fees?esc(numIn(t.fees)):''}">
     <label class="l">Notiz</label><input type="text" id="t-note" value="${esc(t.note||'')}">
     <div class="sub" id="t-profit" style="margin-top:12px"></div>
     <button class="btn" id="t-save">Speichern</button>${delRow(!!id)}`;
@@ -630,16 +637,19 @@ function editTrade(id, kind){
   $('#t-bacc').insertAdjacentHTML('afterbegin','<option value="">nicht von meinem Konto</option>'); if(!t.buyAccount) $('#t-bacc').value='';
   if(!t.sellAccount){ $('#t-sacc').insertAdjacentHTML('afterbegin','<option value="">kein Konto</option>'); $('#t-sacc').value=''; }
   wireAccount('t-bacc'); wireAccount('t-sacc');
-  const calc = () => { const sp=val('t-sp'); const p=sp-val('t-bp')-val('t-bc')-val('t-fe');
-    $('#t-profit').innerHTML = sp ? `Gewinn: <b class="${p>=0?'pos':'neg'}">${fmt(p)}</b>` : `Eingesetzt: <b>${fmt(val('t-bp')+val('t-bc'))}</b>`; };
-  ['t-bp','t-bc','t-sp','t-fe'].forEach(k=>$('#'+k).addEventListener('input',calc)); calc();
+  const calc = () => { const sp=val('t-sp'), mine=!!$('#t-bacc').value && $('#t-bacc').value!=='__new' || $('#t-bacc').value==='__new';
+    $('#t-repaybox').classList.toggle('hidden', mine); $('#t-repayamt').textContent=fmt(val('t-bp'));
+    const rep = !mine && $('#t-repay').checked ? val('t-bp') : 0;
+    const p=sp-val('t-bp')-val('t-bc')-val('t-fe')-val('t-pf'), cash=sp-val('t-fe')-val('t-pf')-rep;
+    $('#t-profit').innerHTML = sp ? `Gewinn: <b class="${p>=0?'pos':'neg'}">${fmt(p)}</b> · aufs Konto: <b>${fmt(cash)}</b>` : `Eingesetzt: <b>${fmt(val('t-bp')+val('t-bc'))}</b>`; };
+  ['t-bp','t-bc','t-sp','t-fe','t-pf'].forEach(k=>$('#'+k).addEventListener('input',calc)); $('#t-bacc').addEventListener('change',calc); $('#t-repay').addEventListener('change',calc); calc();
   $('#t-sp').addEventListener('input',()=>{ if($('#t-sp').value.trim() && !$('#t-sd').value) $('#t-sd').value=today(); });
   wireSheet('trades',id);
   $('#t-save').onclick=()=>{ const item=$('#t-item').value.trim(); const bp=val('t-bp');
     if(!item||!(bp>=0)) return toast('Artikel und Ankaufpreis angeben');
     const sp=val('t-sp');
     S.prefs.tradeBuy=readAccount('t-bacc'); if(readAccount('t-sacc')) S.prefs.tradeSell=readAccount('t-sacc');
-    put('trades',{...t, type:'own', item, buyDate:$('#t-bd').value||today(), buyPrice:bp, buyCosts:val('t-bc')||0, sellDate:sp?($('#t-sd').value||today()):'', sellPrice:sp||'', fees:val('t-fe')||0, note:$('#t-note').value.trim(), buyAccount:readAccount('t-bacc'), sellAccount:readAccount('t-sacc')});
+    put('trades',{...t, type:'own', item, buyDate:$('#t-bd').value||today(), buyPrice:bp, buyCosts:val('t-bc')||0, sellDate:sp?($('#t-sd').value||today()):'', sellPrice:sp||'', fees:val('t-fe')||0, partnerFee:val('t-pf')||0, repay:readAccount('t-bacc')?false:$('#t-repay').checked, note:$('#t-note').value.trim(), buyAccount:readAccount('t-bacc'), sellAccount:readAccount('t-sacc')});
     closeSheet(); toast('Gespeichert'); };
   openSheet();
 }
