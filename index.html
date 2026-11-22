@@ -126,7 +126,7 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
 
   <!-- ERFASSEN -->
   <section id="v-add">
-    <div class="seg" id="mode"><button data-m="out" class="on">Ausgabe</button><button data-m="in" class="in">Einnahme</button></div>
+    <div class="seg" id="mode"><button data-m="out" class="on">Ausgabe</button><button data-m="in" class="in">Einnahme</button><button data-m="tr">Umbuchung</button></div>
     <div class="quick" id="quick"></div>
     <div class="card">
       <div class="amount-row">
@@ -141,6 +141,11 @@ label.l{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
       <label class="l">Welche Schulden?</label>
       <select id="debtsel"></select>
     </div>
+    <div id="trpick" class="hidden">
+      <div class="row"><div><label class="l">Von</label><select id="trfrom"></select></div><div><label class="l">Nach</label><select id="trto"></select></div></div>
+      <div class="sub" style="margin-top:8px">Zum Beispiel Bargeld abheben: von Alltagskonto nach Bargeld. Zählt nicht als Ausgabe.</div>
+    </div>
+    <div id="accpick"><label class="l" id="acclabel">Bezahlt von</label><div class="chips" id="accs" style="margin-top:4px"></div></div>
     <div class="row">
       <div><label class="l">Notiz (optional)</label><input type="text" id="note" placeholder="z. B. Rewe, Asiamarkt" autocomplete="off"></div>
       <div style="flex:0 0 160px"><label class="l">Datum</label><input type="date" id="date"></div>

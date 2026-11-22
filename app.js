@@ -15,7 +15,7 @@ const CATS = [
   {id:'sonstiges', name:'Sonstiges', color:'#9aa0a6', subs:[]},
 ];
 const SOURCES = ['Gehalt','IT-Aufträge','Verkauf','Erstattung','Geschenk','Sonstiges'];
-const TABLE_NAMES = ['expenses','fixed','debts','income','trades','balances'];
+const TABLE_NAMES = ['expenses','fixed','debts','income','trades','balances','transfers'];
 const CAT = Object.fromEntries(CATS.map(c=>[c.id,c]));
 const $ = s => document.querySelector(s);
 const fmt = n => new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n||0);
@@ -36,18 +36,20 @@ const toast = t => { const el=$('#toast'); el.textContent=t; el.classList.add('s
 
 /* ---------- Lokaler Speicher ---------- */
 const KEY='ausgaben-v1';
-const blank = () => ({expenses:{},fixed:{},debts:{},income:{},trades:{},balances:{},queue:[],settings:{url:'',token:''},lastSync:0});
+const blank = () => ({expenses:{},fixed:{},debts:{},income:{},trades:{},balances:{},transfers:{},prefs:{},queue:[],settings:{url:'',token:''},lastSync:0});
 let S = (()=>{ try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s) return Object.assign(blank(),s); }catch(e){} return blank(); })();
-TABLE_NAMES.forEach(t=>{ if(!S[t]) S[t]={}; });
+TABLE_NAMES.forEach(t=>{ if(!S[t]) S[t]={}; }); if(!S.prefs) S.prefs={};
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast('Lokales Speichern fehlgeschlagen'); } }
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 
-let EXP=[], INC=[], FIX=[], FIXIN=[], DEBTS=[], TRADES=[], BAL=null, BALS=[], SIM={};
+let TRS=[], EXP=[], INC=[], FIX=[], FIXIN=[], DEBTS=[], TRADES=[], BAL=null, BALS=[], SIM={};
 const DEFAULT_ACCOUNTS=['Gehaltskonto','Alltagskonto','Bargeld'];
 const live = o => Object.values(o).filter(x=>!x.deleted);
+const accOf = (e,kind) => e.account || (kind==='in'?'Gehaltskonto':'Alltagskonto');
 function rebuild(){
   EXP = live(S.expenses).map(e=>({...e,amount:+e.amount||0})).sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.updatedAt||0)-(a.updatedAt||0));
   INC = live(S.income).map(e=>({...e,amount:+e.amount||0})).sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.updatedAt||0)-(a.updatedAt||0));
+  TRS = live(S.transfers).map(e=>({...e,amount:+e.amount||0})).sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.updatedAt||0)-(a.updatedAt||0));
   const fx = live(S.fixed).sort((a,b)=>(+b.amount||0)-(+a.amount||0));
   FIX = fx.filter(f=>f.kind!=='income'); FIXIN = fx.filter(f=>f.kind==='income');
   DEBTS = live(S.debts).sort((a,b)=>String(a.due||'9999').localeCompare(String(b.due||'9999')));
@@ -147,13 +149,25 @@ function show(v){
 
 /* ---------- Erfassen ---------- */
 $('#date').value = today();
-document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.m; renderCats(); renderQuick(); });
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.m; sel.acc=null; renderCats(); renderQuick(); });
 function renderCats(){
   document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
-  const inc = mode==='in';
-  $('#cats').classList.toggle('hidden',inc); $('#subs').classList.toggle('hidden',inc); $('#srcs').classList.toggle('hidden',!inc);
-  $('#save').textContent = inc ? 'Einnahme speichern' : 'Speichern';
-  $('#note').placeholder = inc ? 'z. B. Westenergie, iPad-Verkauf' : 'z. B. Rewe, Asiamarkt';
+  const inc = mode==='in', tr = mode==='tr';
+  $('#cats').classList.toggle('hidden',inc||tr); $('#subs').classList.toggle('hidden',inc||tr); $('#srcs').classList.toggle('hidden',!inc);
+  $('#trpick').classList.toggle('hidden',!tr); $('#accpick').classList.toggle('hidden',tr);
+  $('#save').textContent = inc ? 'Einnahme speichern' : tr ? 'Umbuchung speichern' : 'Speichern';
+  $('#note').placeholder = inc ? 'z. B. Gehalt, iPad-Verkauf' : tr ? 'z. B. Geld abgehoben' : 'z. B. Rewe, Asiamarkt';
+  const accs = accounts();
+  if(tr){
+    const opt = v => accs.map(a=>`<option ${a===v?'selected':''}>${esc(a)}</option>`).join('');
+    const f = $('#trfrom').value || S.prefs.trFrom || 'Alltagskonto', t = $('#trto').value || S.prefs.trTo || 'Bargeld';
+    $('#trfrom').innerHTML = opt(f); $('#trto').innerHTML = opt(t);
+  } else {
+    if(!sel.acc || !accs.includes(sel.acc)) sel.acc = (inc ? S.prefs.accIn : S.prefs.accOut) || (inc ? 'Gehaltskonto' : 'Alltagskonto');
+    $('#acclabel').textContent = inc ? 'Eingegangen auf' : 'Bezahlt von';
+    $('#accs').innerHTML = accs.map(a=>`<button class="chip ${sel.acc===a?'on':''}">${esc(a)}</button>`).join('');
+    document.querySelectorAll('#accs .chip').forEach((b,i)=>b.onclick=()=>{ sel.acc=accs[i]; S.prefs[inc?'accIn':'accOut']=sel.acc; persist(); renderCats(); });
+  }
   $('#srcs').innerHTML = SOURCES.map(s=>`<button class="chip ${sel.src===s?'on':''}">${esc(s)}</button>`).join('');
   document.querySelectorAll('#srcs .chip').forEach((b,i)=>b.onclick=()=>{ sel.src=SOURCES[i]; renderCats(); });
   $('#cats').innerHTML = CATS.map(c=>`<button class="cat ${sel.cat===c.id?'on':''}" data-c="${c.id}"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</button>`).join('');
@@ -161,7 +175,7 @@ function renderCats(){
   const c = CAT[sel.cat];
   $('#subs').innerHTML = c && c.subs.length ? c.subs.map(s=>`<button class="chip ${sel.sub===s?'on':''}">${esc(s)}</button>`).join('') : '';
   document.querySelectorAll('#subs .chip').forEach((b,i)=>b.onclick=()=>{ sel.sub=c.subs[i]; renderCats(); });
-  const isDebt = !inc && sel.cat==='schulden';
+  const isDebt = mode==='out' && sel.cat==='schulden';
   $('#debtpick').classList.toggle('hidden', !isDebt);
   if(isDebt){
     const open = DEBTS.filter(d=>SIM[d.id].remaining>0.005);
@@ -169,14 +183,14 @@ function renderCats(){
   }
   validate();
 }
-function validate(){ $('#save').disabled = !((mode==='in' || sel.cat) && parseAmt($('#amt').value)>0); }
+function validate(){ $('#save').disabled = !((mode!=='out' || sel.cat) && parseAmt($('#amt').value)>0); }
 $('#amt').addEventListener('input',validate);
 $('#amt').addEventListener('keydown',e=>{ if(e.key==='Enter') save(); });
 $('#note').addEventListener('keydown',e=>{ if(e.key==='Enter') save(); });
 $('#save').onclick = save;
 
 function renderQuick(){
-  if(mode==='in'){ $('#quick').innerHTML=''; return; }
+  if(mode!=='out'){ $('#quick').innerHTML=''; return; }
   const counts={};
   EXP.slice(0,120).forEach(e=>{ if(e.cat==='schulden') return; const k=e.cat+'|'+(e.sub||'')+'|'+(e.note||'').trim(); counts[k]=(counts[k]||0)+1; });
   const top = Object.entries(counts).filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1]).slice(0,6);
@@ -187,12 +201,18 @@ function renderQuick(){
 function save(){
   const amount = parseAmt($('#amt').value);
   if(!(amount>0)) return;
-  if(mode==='in'){
-    put('income', { id:uid(), amount, source:sel.src||'Sonstiges', note:$('#note').value.trim(), date:$('#date').value||today() });
+  if(mode==='tr'){
+    const from=$('#trfrom').value, to=$('#trto').value;
+    if(from===to) return toast('Von und Nach müssen verschieden sein');
+    S.prefs.trFrom=from; S.prefs.trTo=to;
+    put('transfers', { id:uid(), amount, from, to, note:$('#note').value.trim(), date:$('#date').value||today() });
+    toast(fmt(amount)+' umgebucht');
+  } else if(mode==='in'){
+    put('income', { id:uid(), amount, source:sel.src||'Sonstiges', note:$('#note').value.trim(), date:$('#date').value||today(), account:sel.acc||'' });
     toast('+'+fmt(amount)+' gespeichert');
   } else {
     if(!sel.cat) return;
-    const rec = { id:uid(), amount, cat:sel.cat, sub:sel.sub||'', note:$('#note').value.trim(), date:$('#date').value||today(), debtId:'' };
+    const rec = { id:uid(), amount, cat:sel.cat, sub:sel.sub||'', note:$('#note').value.trim(), date:$('#date').value||today(), debtId:'', account:sel.acc||'' };
     if(sel.cat==='schulden'){ const id=$('#debtsel').value; if(id) rec.debtId=id; }
     put('expenses', rec);
     toast(fmt(amount)+' gespeichert');
@@ -205,21 +225,23 @@ function save(){
 $('#search').addEventListener('input',renderList);
 function renderList(){
   const q = $('#search').value.trim().toLowerCase();
-  const all = [...EXP.map(e=>({...e,_t:'out'})), ...INC.map(e=>({...e,_t:'in'}))]
+  const all = [...EXP.map(e=>({...e,_t:'out'})), ...INC.map(e=>({...e,_t:'in'})), ...TRS.map(e=>({...e,_t:'tr'}))]
     .sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.updatedAt||0)-(a.updatedAt||0));
-  const rows = all.filter(e=>!q || [(e.note||''),(e.sub||''),(e.source||''),e._t==='in'?'einnahme':(CAT[e.cat]?.name||'')].join(' ').toLowerCase().includes(q));
+  const rows = all.filter(e=>!q || [(e.note||''),(e.sub||''),(e.source||''),(e.account||''),(e.from||''),(e.to||''),e._t==='in'?'einnahme':e._t==='tr'?'umbuchung':(CAT[e.cat]?.name||'')].join(' ').toLowerCase().includes(q));
   if(!rows.length){ $('#list').innerHTML = `<div class="empty">${all.length?'Nichts gefunden.':'Noch nichts erfasst.'}</div>`; return; }
   let html='', cur=null, chunk=[];
   const line = e => e._t==='in'
-    ? `<div class="item" data-id="${esc(e.id)}" data-t="in"><span class="dot" style="background:var(--pos)"></span><div class="t"><b>${esc(e.note||e.source||'Einnahme')}</b><span>Einnahme · ${esc(e.source||'')}</span></div><div class="a pos">+${fmt(e.amount)}</div></div>`
-    : `<div class="item" data-id="${esc(e.id)}" data-t="out"><span class="dot" style="background:${CAT[e.cat]?.color||'#999'}"></span><div class="t"><b>${esc(e.note||e.sub||CAT[e.cat]?.name)}</b><span>${esc(CAT[e.cat]?.name||e.cat)}${e.sub?' · '+esc(e.sub):''}</span></div><div class="a">${fmt(e.amount)}</div></div>`;
-  const flush=()=>{ if(!cur) return; const sum=chunk.reduce((a,e)=>a+(e._t==='in'?0:e.amount),0);
+    ? `<div class="item" data-id="${esc(e.id)}" data-t="in"><span class="dot" style="background:var(--pos)"></span><div class="t"><b>${esc(e.note||e.source||'Einnahme')}</b><span>Einnahme · ${esc(e.source||'')} · ${esc(accOf(e,'in'))}</span></div><div class="a pos">+${fmt(e.amount)}</div></div>`
+    : e._t==='tr'
+    ? `<div class="item" data-id="${esc(e.id)}" data-t="tr"><span class="dot" style="background:var(--muted)"></span><div class="t"><b>${esc(e.note||'Umbuchung')}</b><span>${esc(e.from)} → ${esc(e.to)}</span></div><div class="a muted">${fmt(e.amount)}</div></div>`
+    : `<div class="item" data-id="${esc(e.id)}" data-t="out"><span class="dot" style="background:${CAT[e.cat]?.color||'#999'}"></span><div class="t"><b>${esc(e.note||e.sub||CAT[e.cat]?.name)}</b><span>${esc(CAT[e.cat]?.name||e.cat)}${e.sub?' · '+esc(e.sub):''} · ${esc(accOf(e,'out'))}</span></div><div class="a">${fmt(e.amount)}</div></div>`;
+  const flush=()=>{ if(!cur) return; const sum=chunk.reduce((a,e)=>a+(e._t==='out'?e.amount:0),0);
     const d=new Date(cur+'T12:00'); const lbl=isNaN(d)?cur:d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'long'});
     html+=`<div class="day"><span>${lbl}</span><span>${sum?fmt(sum):''}</span></div>`+chunk.map(line).join(''); };
   rows.slice(0,400).forEach(e=>{ if(e.date!==cur){ flush(); cur=e.date; chunk=[]; } chunk.push(e); });
   flush();
   $('#list').innerHTML = html;
-  document.querySelectorAll('#list .item').forEach(el=>el.onclick=()=> el.dataset.t==='in' ? editIncome(el.dataset.id) : editExpense(el.dataset.id));
+  document.querySelectorAll('#list .item').forEach(el=>el.onclick=()=> el.dataset.t==='in' ? editIncome(el.dataset.id) : el.dataset.t==='tr' ? editTransfer(el.dataset.id) : editExpense(el.dataset.id));
 }
 
 function confirmBtn(btn, fn){ btn.onclick=ev=>{ if(btn.dataset.c!=='1'){ btn.dataset.c='1'; btn.textContent='Wirklich löschen?'; return; } fn(); }; }
@@ -228,8 +250,8 @@ function wireSheet(table,id){ $('#x-cancel').onclick=closeSheet; if($('#x-del'))
 
 function editExpense(id){
   const e = S.expenses[id]; if(!e) return;
-  let cat=e.cat, sub=e.sub, dAmt=numIn(e.amount), dNote=e.note||'', dDate=e.date;
-  const keep=()=>{ dAmt=$('#e-amt').value; dNote=$('#e-note').value; dDate=$('#e-date').value; };
+  let cat=e.cat, sub=e.sub, dAmt=numIn(e.amount), dNote=e.note||'', dDate=e.date, dAcc=accOf(e,'out');
+  const keep=()=>{ dAmt=$('#e-amt').value; dNote=$('#e-note').value; dDate=$('#e-date').value; dAcc=readAccount('e-acc'); };
   const draw=()=>{
     const c=CAT[cat];
     $('#sheet').innerHTML = `<h3>Ausgabe bearbeiten</h3>
@@ -238,12 +260,14 @@ function editExpense(id){
       ${c&&c.subs.length?`<label class="l">Unterkategorie</label><select id="e-sub">${c.subs.map(s=>`<option ${s===sub?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}
       <label class="l">Notiz</label><input type="text" id="e-note" value="${esc(dNote)}">
       <label class="l">Datum</label><input type="date" id="e-date" value="${esc(dDate)}">
+      ${accountField('e-acc', dAcc)}
       <button class="btn" id="e-save">Speichern</button>${delRow(true)}`;
+    wireAccount('e-acc');
     $('#e-cat').onchange=ev=>{ keep(); cat=ev.target.value; sub=CAT[cat].subs[0]||''; draw(); };
     if($('#e-sub')) $('#e-sub').onchange=ev=>sub=ev.target.value;
     wireSheet('expenses',id);
     $('#e-save').onclick=()=>{ const a=parseAmt($('#e-amt').value); if(!(a>0)) return toast('Betrag prüfen');
-      put('expenses', {...e, amount:a, cat, sub:(CAT[cat].subs.includes(sub)?sub:'')||'', note:$('#e-note').value.trim(), date:$('#e-date').value||e.date});
+      put('expenses', {...e, amount:a, cat, sub:(CAT[cat].subs.includes(sub)?sub:'')||'', note:$('#e-note').value.trim(), date:$('#e-date').value||e.date, account:readAccount('e-acc')});
       closeSheet(); toast('Gespeichert'); };
   };
   draw(); openSheet();
@@ -256,10 +280,28 @@ function editIncome(id){
     <label class="l">Quelle</label><select id="i-src">${SOURCES.map(s=>`<option ${s===e.source?'selected':''}>${esc(s)}</option>`).join('')}</select>
     <label class="l">Notiz</label><input type="text" id="i-note" value="${esc(e.note||'')}">
     <label class="l">Datum</label><input type="date" id="i-date" value="${esc(e.date)}">
+    ${accountField('i-acc', accOf(e,'in'))}
     <button class="btn" id="i-save">Speichern</button>${delRow(true)}`;
+  wireAccount('i-acc');
   wireSheet('income',id);
   $('#i-save').onclick=()=>{ const a=parseAmt($('#i-amt').value); if(!(a>0)) return toast('Betrag prüfen');
-    put('income', {...e, amount:a, source:$('#i-src').value, note:$('#i-note').value.trim(), date:$('#i-date').value||e.date}); closeSheet(); toast('Gespeichert'); };
+    put('income', {...e, amount:a, source:$('#i-src').value, note:$('#i-note').value.trim(), date:$('#i-date').value||e.date, account:readAccount('i-acc')}); closeSheet(); toast('Gespeichert'); };
+  openSheet();
+}
+
+function editTransfer(id){
+  const e = S.transfers[id]; if(!e) return;
+  const opt = v => accounts().map(a=>`<option ${a===v?'selected':''}>${esc(a)}</option>`).join('');
+  $('#sheet').innerHTML = `<h3>Umbuchung bearbeiten</h3>
+    <label class="l">Betrag (€)</label><input type="text" id="u-amt" inputmode="decimal" value="${esc(numIn(e.amount))}">
+    <div class="row"><div><label class="l">Von</label><select id="u-from">${opt(e.from)}</select></div><div><label class="l">Nach</label><select id="u-to">${opt(e.to)}</select></div></div>
+    <label class="l">Notiz</label><input type="text" id="u-note" value="${esc(e.note||'')}">
+    <label class="l">Datum</label><input type="date" id="u-date" value="${esc(e.date)}">
+    <button class="btn" id="u-save">Speichern</button>${delRow(true)}`;
+  wireSheet('transfers',id);
+  $('#u-save').onclick=()=>{ const a=parseAmt($('#u-amt').value); if(!(a>0)) return toast('Betrag prüfen');
+    if($('#u-from').value===$('#u-to').value) return toast('Von und Nach müssen verschieden sein');
+    put('transfers', {...e, amount:a, from:$('#u-from').value, to:$('#u-to').value, note:$('#u-note').value.trim(), date:$('#u-date').value||e.date}); closeSheet(); toast('Gespeichert'); };
   openSheet();
 }
 
@@ -306,7 +348,7 @@ function monthData(m){
 }
 
 /* ---------- Finanzen ---------- */
-const accounts = () => { const a=[...DEFAULT_ACCOUNTS]; [...BALS.map(b=>b.account), ...live(S.fixed).map(f=>f.account)].forEach(x=>{ if(x && !a.includes(x)) a.push(x); }); return a; };
+const accounts = () => { const a=[...DEFAULT_ACCOUNTS]; [...BALS.map(b=>b.account), ...live(S.fixed).map(f=>f.account), ...EXP.map(e=>e.account), ...INC.map(e=>e.account), ...TRS.map(t=>t.from), ...TRS.map(t=>t.to)].forEach(x=>{ if(x && !a.includes(x)) a.push(x); }); return a; };
 const bookDate = (f,m) => m+'-'+String(Math.min(+f.day||1, daysIn(m))).padStart(2,'0');
 const fixActive = (f,m) => f.active!==false && !(f.start && m<f.start) && !(f.end && m>f.end);
 // feste Buchungen (Einnahmen +, Kosten −) eines Kontos zwischen zwei Daten (from exklusiv, to inklusiv)
@@ -322,6 +364,17 @@ function fixedBookings(from, to, account){
   }
   return out;
 }
+// alle Bewegungen eines Kontos seit einem eingetragenen Stand
+function movements(b, to){
+  const acc=b.account, d0=b.date, u0=b.updatedAt||0;
+  const after = e => e.date<=to && (e.date>d0 || (e.date===d0 && (e.updatedAt||0)>u0));
+  const out = EXP.filter(e=>accOf(e,'out')===acc && after(e)).reduce((a,e)=>a+e.amount,0);
+  const inc = INC.filter(e=>accOf(e,'in')===acc && after(e)).reduce((a,e)=>a+e.amount,0);
+  const tr = TRS.filter(after).reduce((a,t)=>a+(t.to===acc?t.amount:0)-(t.from===acc?t.amount:0),0);
+  const fx = fixedBookings(d0,to,acc).reduce((a,x)=>a+x.amount,0);
+  const parts = [['Ausgaben',-out],['Einnahmen',inc],['Umbuchungen',tr],['feste Buchungen',fx]].filter(([,v])=>Math.abs(v)>0.004);
+  return {total:inc-out+tr+fx, parts};
+}
 function upcoming(n){
   const t=today(), m0=ym(t), items=[];
   [m0, addM(m0,1)].forEach(m=>{
@@ -333,10 +386,10 @@ function upcoming(n){
 }
 function renderFix(){
   const t=today();
-  const rows = BALS.map(b=>{ const bk=fixedBookings(b.date,t,b.account); const delta=bk.reduce((a,x)=>a+x.amount,0); return {...b, delta, est:(+b.amount||0)+delta}; });
+  const rows = BALS.map(b=>{ const mv=movements(b,t); return {...b, mv, delta:mv.total, est:(+b.amount||0)+mv.total}; });
   const totalEst = rows.reduce((a,r)=>a+r.est,0);
   $('#balance').innerHTML = `<div class="card" style="padding:6px 16px">${rows.length ? rows.map(r=>`<div class="catline" data-acc="${esc(r.account)}"><div class="h"><span>${esc(r.account)}</span><b>${fmt(r.est)}</b></div>
-      <div class="sub" style="font-size:13px">Stand ${dDE(r.date)}: ${fmt(r.amount)}${r.delta?` · seitdem feste Buchungen <span class="${r.delta>=0?'pos':'neg'}">${r.delta>=0?'+':'−'}${fmt(Math.abs(r.delta))}</span>`:''}</div></div>`).join('')
+      <div class="sub" style="font-size:13px">Eingetragen am ${dDE(r.date)}: ${fmt(r.amount)}${r.mv.parts.length?' · seitdem '+r.mv.parts.map(([l,v])=>`${l} <span class="${v>=0?'pos':'neg'}">${v>=0?'+':'−'}${fmt(Math.abs(v))}</span>`).join(', '):''}</div></div>`).join('')
       + (rows.length>1?`<div class="catline"><div class="h"><span class="muted">Gesamt</span><b>${fmt(totalEst)}</b></div></div>`:'')
       : '<div class="empty" style="padding:12px">Noch kein Kontostand eingetragen.</div>'}</div>
     <button class="btn sec" id="newbal">Kontostand oder Bargeld eintragen</button>`;
@@ -380,7 +433,7 @@ function editBalance(acc){
     ${accountField('b-acc', acc||DEFAULT_ACCOUNTS[0])}
     <label class="l">Aktueller Kontostand (€)</label><input type="text" id="b-amt" inputmode="decimal" placeholder="z. B. 1234,56">
     <label class="l">Stand vom</label><input type="date" id="b-date" value="${today()}">
-    <div class="sub" style="margin-top:10px">Ab diesem Stand rechnet die App die festen Buchungen dieses Kontos (Gehalt, Fixkosten mit Tag) automatisch weiter.</div>
+    <div class="sub" style="margin-top:10px">Ab diesem Stand rechnet die App automatisch weiter: Ausgaben und Einnahmen, die du mit diesem Konto erfasst, Umbuchungen und feste Buchungen mit Tag.</div>
     ${hist.length?`<div class="sub" style="margin-top:10px">Letzte Stände: ${hist.map(h=>dDE(h.date)+' '+fmt(h.amount)).join(' · ')}</div>`:''}
     <button class="btn" id="b-save">Speichern</button>${delRow(false)}`;
   wireAccount('b-acc');
@@ -435,7 +488,7 @@ function editDebt(id){
     <button class="btn" id="d-save">Speichern</button>${delRow(!!id)}`;
   wireSheet('debts',id);
   if(s) $('#d-paybtn').onclick=()=>{ const a=parseAmt($('#d-pay').value); if(!(a>0)) return toast('Betrag prüfen');
-    put('expenses',{id:uid(), amount:a, cat:'schulden', sub:'Rückzahlung', note:d.name, date:today(), debtId:d.id}); closeSheet(); toast(fmt(a)+' abgezogen'); };
+    put('expenses',{id:uid(), amount:a, cat:'schulden', sub:'Rückzahlung', note:d.name, date:today(), debtId:d.id, account:S.prefs.accOut||'Alltagskonto'}); closeSheet(); toast(fmt(a)+' abgezogen'); };
   $('#d-save').onclick=()=>{ const t=parseAmt($('#d-total').value), r=$('#d-rate').value.trim()?parseAmt($('#d-rate').value):0, z=$('#d-int').value.trim()?parseAmt($('#d-int').value):0, n=$('#d-name').value.trim();
     if(!n||!(t>0)||!(r>=0)||!(z>=0)) return toast('Bezeichnung und Betrag angeben');
     put('debts', {...d, name:n, total:t, rate:r||0, interest:z||0, start:$('#d-start').value||ym(today()), due:$('#d-due').value||'', note:$('#d-note').value.trim()});
