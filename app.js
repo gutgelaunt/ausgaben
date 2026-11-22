@@ -425,6 +425,9 @@ function bookingsBetween(from, to){ // from exklusiv, to exklusiv
     items.push(...debtBookings(m, from, {date:to}));
   }
   DEBTS.forEach(d=>{ if(d.due && d.due>from && d.due<to && SIM[d.id].remaining>0.005) items.push({date:d.due,name:d.name+' (fällig)',amount:-SIM[d.id].remaining}); });
+  // schon erfasste Einzelbuchungen mit Datum in der Zukunft
+  EXP.forEach(e=>{ if(e.date>from && e.date<to) items.push({date:e.date,name:e.note||e.sub||CAT[e.cat]?.name||'Ausgabe',amount:-e.amount,acc:accOf(e,'out')}); });
+  INC.forEach(e=>{ if(e.date>from && e.date<to) items.push({date:e.date,name:e.note||e.source||'Einnahme',amount:e.amount,acc:accOf(e,'in')}); });
   return items.sort((a,b)=>a.date.localeCompare(b.date));
 }
 function renderFree(show){
