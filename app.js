@@ -277,7 +277,7 @@ function editIncome(id){
   const e = S.income[id]; if(!e) return;
   $('#sheet').innerHTML = `<h3>Einnahme bearbeiten</h3>
     <label class="l">Betrag (€)</label><input type="text" id="i-amt" inputmode="decimal" value="${esc(numIn(e.amount))}">
-    <label class="l">Quelle</label><select id="i-src">${SOURCES.map(s=>`<option ${s===e.source?'selected':''}>${esc(s)}</option>`).join('')}</select>
+    <label class="l">Quelle</label><select id="i-src">${(SOURCES.includes(e.source)||!e.source?SOURCES:[...SOURCES,e.source]).map(s=>`<option ${s===e.source?'selected':''}>${esc(s)}</option>`).join('')}</select>
     <label class="l">Notiz</label><input type="text" id="i-note" value="${esc(e.note||'')}">
     <label class="l">Datum</label><input type="date" id="i-date" value="${esc(e.date)}">
     ${accountField('i-acc', accOf(e,'in'))}
@@ -309,19 +309,23 @@ function editTransfer(id){
 function debtSim(d){
   const total=+d.total||0, rate=+d.rate||0, z=(+d.interest||0)/1200, now=ym(today());
   const start = d.start || now;
-  const extras={}; EXP.filter(e=>e.debtId===d.id).forEach(e=>{ const m=ym(e.date)<start?start:ym(e.date); extras[m]=(extras[m]||0)+e.amount; });
-  let bal=total, interest=0, extra=0; const rates={};
+  const extras={}, borrows={}, mOf=x=>ym(x.date)<start?start:ym(x.date);
+  EXP.filter(e=>e.debtId===d.id).forEach(e=>{ const m=mOf(e); extras[m]=(extras[m]||0)+e.amount; });
+  INC.filter(e=>e.debtId===d.id).forEach(e=>{ const m=mOf(e); borrows[m]=(borrows[m]||0)+e.amount; });
+  let bal=total, interest=0, extra=0, borrowed=0; const rates={}, hist=[];
   const n=Math.max(0,mDiff(start,now));
   for(let k=0;k<=n;k++){
-    const m=addM(start,k);
-    if(rate && bal>0.005 && (!d.rateStart || m>=d.rateStart)){ const p=Math.min(rate,bal); rates[m]=p; bal-=p; }
+    const m=addM(start,k), b0=bal;
+    const br=borrows[m]||0; bal+=br; borrowed+=br;
+    let rp=0; if(rate && bal>0.005 && (!d.rateStart || m>=d.rateStart)){ rp=Math.min(rate,bal); rates[m]=rp; bal-=rp; }
     const ex=extras[m]||0; bal-=ex; extra+=ex;
-    if(k<n && bal>0.005 && z){ const i=bal*z; bal+=i; interest+=i; }
+    let zi=0; if(k<n && bal>0.005 && z){ zi=bal*z; bal+=zi; interest+=zi; }
+    hist.push({m, start:b0, borrowed:br, rate:rp, extra:ex, interest:zi, end:bal});
   }
   const remaining=Math.max(0,Math.round(bal*100)/100);
   let monthsLeft=null;
   if(rate && remaining>0.005){ let b=remaining,k=0; while(b>0.005 && k<600){ k++; b+=b*z; b-=rate; } monthsLeft=k<600?k:null; }
-  return {total, remaining, interest, extra, rates, monthsLeft, paid: total+interest-remaining};
+  return {total, remaining, interest, extra, borrowed, rates, hist, monthsLeft, paid: total+borrowed+interest-remaining};
 }
 
 /* ---------- Monatswerte ---------- */
@@ -338,7 +342,7 @@ const tradeProfit = t => (+t.sellPrice||0) - (+t.buyPrice||0) - (+t.buyCosts||0)
 function monthData(m){
   const vars = EXP.filter(e=>ym(e.date)===m);
   const fx = fixedFor(m);
-  const incs = INC.filter(e=>ym(e.date)===m);
+  const incs = INC.filter(e=>ym(e.date)===m && !e.debtId);
   const fxin = fixedIncomeFor(m);
   const sold = TRADES.filter(t=>t.sellDate && ym(t.sellDate)===m);
   const v = vars.reduce((a,e)=>a+e.amount,0), f = fx.reduce((a,x)=>a+x.amount,0);
@@ -453,7 +457,7 @@ function renderFix(){
   const totalOpen = DEBTS.reduce((a,d)=>a+SIM[d.id].remaining,0);
   $('#debtsum').textContent = DEBTS.length ? 'offen gesamt '+fmt(totalOpen) : '';
   const soon = addDays(today(),14);
-  $('#debts').innerHTML = DEBTS.length ? DEBTS.map(d=>{ const s=SIM[d.id]; const base=s.total+s.interest; const pct=base?Math.min(100,s.paid/base*100):0;
+  $('#debts').innerHTML = DEBTS.length ? DEBTS.map(d=>{ const s=SIM[d.id]; const base=s.total+s.borrowed+s.interest; const pct=base?Math.min(100,s.paid/base*100):0;
     const end = s.monthsLeft ? mLabel(addM(ym(today()),s.monthsLeft),true) : null;
     const open = s.remaining>0.005;
     const dueTxt = d.due && open ? `<span class="${d.due<=soon?'duesoon':''}">fällig ${dDE(d.due)}</span>` : '';
@@ -528,8 +532,13 @@ function editDebt(id){
   const d = id ? {...S.debts[id]} : {id:uid(),name:'',total:'',rate:'',start:ym(today()),interest:'',due:'',note:'',rateStart:'',day:'',account:''};
   const s = id ? SIM[id] : null;
   $('#sheet').innerHTML=`<h3>${id?esc(d.name):'Neue Schulden'}</h3>
-    ${s?`<div class="sub">Offen: <b>${fmt(s.remaining)}</b>${s.interest?' (inkl. '+fmt(s.interest)+' Zinsen)':''}</div>
-    <div class="row" style="align-items:flex-end"><div><label class="l">Rückzahlung erfassen (€)</label><input type="text" id="d-pay" inputmode="decimal" placeholder="z. B. 100"></div><div style="flex:0 0 auto"><button class="btn small" id="d-paybtn" style="margin-bottom:2px">Abziehen</button></div></div>`:''}
+    ${s?`<div class="sub">Offen: <b>${fmt(s.remaining)}</b> · Start ${fmt(s.total)}${s.borrowed?' + neu geliehen '+fmt(s.borrowed):''}${s.interest?' + Zinsen '+fmt(s.interest):''} − getilgt ${fmt(s.paid)}</div>
+    <div class="row" style="align-items:flex-end"><div><label class="l">Betrag (€)</label><input type="text" id="d-pay" inputmode="decimal" placeholder="z. B. 100"></div>
+    <div><label class="l">Datum</label><input type="date" id="d-pdate" value="${today()}"></div></div>
+    ${accountField('d-pacc', S.prefs.accOut||'Alltagskonto')}
+    <div class="row"><button class="btn small" id="d-paybtn">Zurückgezahlt</button><button class="btn sec small" id="d-borrowbtn">Neu geliehen</button></div>
+    <button class="btn sec small" id="d-histbtn" style="margin-top:8px">Verlauf Monat für Monat</button>
+    <div id="d-hist" class="hidden" style="margin-top:8px"></div>`:''}
     <label class="l">Bezeichnung</label><input type="text" id="d-name" value="${esc(d.name)}" placeholder="z. B. Sebastian, PayPal, Krankenkasse">
     <div class="row"><div><label class="l">Offener Betrag zum Start (€)</label><input type="text" id="d-total" inputmode="decimal" value="${esc(numIn(d.total))}"></div>
     <div><label class="l">Stand vom (Monat)</label><input type="month" id="d-start" value="${esc(d.start||'')}"></div></div>
@@ -544,8 +553,18 @@ function editDebt(id){
     <button class="btn" id="d-save">Speichern</button>${delRow(!!id)}`;
   wireAccount('d-acc');
   wireSheet('debts',id);
-  if(s) $('#d-paybtn').onclick=()=>{ const a=parseAmt($('#d-pay').value); if(!(a>0)) return toast('Betrag prüfen');
-    put('expenses',{id:uid(), amount:a, cat:'schulden', sub:'Rückzahlung', note:d.name, date:today(), debtId:d.id, account:S.prefs.accOut||'Alltagskonto'}); closeSheet(); toast(fmt(a)+' abgezogen'); };
+  if(s){
+    wireAccount('d-pacc');
+    $('#d-paybtn').onclick=()=>{ const a=parseAmt($('#d-pay').value); if(!(a>0)) return toast('Betrag prüfen');
+      put('expenses',{id:uid(), amount:a, cat:'schulden', sub:'Rückzahlung', note:d.name, date:$('#d-pdate').value||today(), debtId:d.id, account:readAccount('d-pacc')}); closeSheet(); toast(fmt(a)+' zurückgezahlt'); };
+    $('#d-borrowbtn').onclick=()=>{ const a=parseAmt($('#d-pay').value); if(!(a>0)) return toast('Betrag prüfen');
+      put('income',{id:uid(), amount:a, source:'Darlehen', note:d.name, date:$('#d-pdate').value||today(), debtId:d.id, account:readAccount('d-pacc')}); closeSheet(); toast(fmt(a)+' als geliehen eingetragen'); };
+    $('#d-histbtn').onclick=()=>{ const el=$('#d-hist'); el.classList.toggle('hidden'); if(el.innerHTML) return;
+      const ev=[...EXP.filter(e=>e.debtId===d.id).map(e=>({date:e.date,txt:'zurückgezahlt',a:-e.amount})), ...INC.filter(e=>e.debtId===d.id).map(e=>({date:e.date,txt:'neu geliehen',a:e.amount}))].sort((x,y)=>x.date.localeCompare(y.date));
+      el.innerHTML = `<div class="card" style="padding:6px 12px;font-size:13px">${s.hist.slice().reverse().filter(h=>h.borrowed||h.rate||h.extra||h.interest||h.m===s.hist[0].m||h.m===ym(today())).map(h=>`<div class="catline"><div class="h"><span><b>${mLabel(h.m,true)}</b></span><b>${fmt(h.end)}</b></div>
+        <div class="sub" style="font-size:12px">Anfang ${fmt(h.start)}${h.borrowed?' · neu geliehen +'+fmt(h.borrowed):''}${h.rate?' · Rate −'+fmt(h.rate):''}${h.extra?' · zurückgezahlt −'+fmt(h.extra):''}${h.interest?' · Zinsen +'+fmt(h.interest):''}</div></div>`).join('')}</div>
+        ${ev.length?`<div class="sub" style="margin-top:6px">Einzelne Zahlungen: ${ev.map(x=>dDE(x.date)+' '+x.txt+' '+fmt(Math.abs(x.a))).join(' · ')}</div>`:''}`; };
+  }
   $('#d-save').onclick=()=>{ const t=parseAmt($('#d-total').value), r=$('#d-rate').value.trim()?parseAmt($('#d-rate').value):0, z=$('#d-int').value.trim()?parseAmt($('#d-int').value):0, n=$('#d-name').value.trim();
     if(!n||!(t>0)||!(r>=0)||!(z>=0)) return toast('Bezeichnung und Betrag angeben');
     const dy=parseInt($('#d-day').value,10);
