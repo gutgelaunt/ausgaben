@@ -352,7 +352,7 @@ function monthData(m){
 }
 
 /* ---------- Finanzen ---------- */
-const accounts = () => { const a=[...DEFAULT_ACCOUNTS]; [...BALS.map(b=>b.account), ...live(S.fixed).map(f=>f.account), ...EXP.map(e=>e.account), ...INC.map(e=>e.account), ...TRS.map(t=>t.from), ...TRS.map(t=>t.to)].forEach(x=>{ if(x && !a.includes(x)) a.push(x); }); return a; };
+const accounts = () => { const a=[...DEFAULT_ACCOUNTS]; [...TRADES.map(t=>t.buyAccount), ...TRADES.map(t=>t.sellAccount), ...BALS.map(b=>b.account), ...live(S.fixed).map(f=>f.account), ...EXP.map(e=>e.account), ...INC.map(e=>e.account), ...TRS.map(t=>t.from), ...TRS.map(t=>t.to)].forEach(x=>{ if(x && !a.includes(x)) a.push(x); }); return a; };
 const bookDate = (f,m) => m+'-'+String(Math.min(+f.day||1, daysIn(m))).padStart(2,'0');
 const fixActive = (f,m) => f.active!==false && !(f.start && m<f.start) && !(f.end && m>f.end);
 // feste Buchungen (Einnahmen +, Kosten −) eines Kontos zwischen zwei Daten (from exklusiv, to inklusiv)
@@ -390,8 +390,12 @@ function movements(b, to){
   const inc = INC.filter(e=>accOf(e,'in')===acc && after(e)).reduce((a,e)=>a+e.amount,0);
   const tr = TRS.filter(after).reduce((a,t)=>a+(t.to===acc?t.amount:0)-(t.from===acc?t.amount:0),0);
   const fx = fixedBookings(d0,to,acc).reduce((a,x)=>a+x.amount,0);
-  const parts = [['Ausgaben',-out],['Einnahmen',inc],['Umbuchungen',tr],['feste Buchungen',fx]].filter(([,v])=>Math.abs(v)>0.004);
-  return {total:inc-out+tr+fx, parts};
+  let hd=0; TRADES.forEach(t=>{
+    if(t.type!=='comm' && t.buyAccount===acc && t.buyDate && after({date:t.buyDate,updatedAt:t.updatedAt})) hd-=(+t.buyPrice||0)+(+t.buyCosts||0);
+    if(t.sellAccount===acc && t.sellDate && after({date:t.sellDate,updatedAt:t.updatedAt})) hd+=(+t.sellPrice||0)-(+t.fees||0);
+  });
+  const parts = [['Ausgaben',-out],['Einnahmen',inc],['Umbuchungen',tr],['feste Buchungen',fx],['Handel',hd]].filter(([,v])=>Math.abs(v)>0.004);
+  return {total:inc-out+tr+fx+hd, parts};
 }
 function upcoming(n){
   const t=today(), m0=ym(t), items=[];
@@ -469,7 +473,7 @@ function renderFix(){
   const byDay = arr => arr.slice().sort((a,b)=>(+a.day||99)-(+b.day||99));
   const list=(arr,empty,cls)=>{ const sum=arr.filter(f=>f.active!==false).reduce((a,f)=>a+(+f.amount||0),0);
     return arr.length ? `<div class="card" style="padding:6px 16px">${byDay(arr).map(f=>`<div class="catline" data-id="${esc(f.id)}"><div class="h"><span><i class="dot" style="background:${f.kind==='income'?'var(--pos)':(CAT[f.cat]?.color||'#999')}"></i>${esc(f.name)}</span><b class="${cls}">${fmt(f.amount)}</b></div>
-      <div class="sub" style="font-size:13px;margin-left:18px">${[f.day?'am '+f.day+'.':'ohne Tag', f.account||'', f.end?'bis '+mLabel(f.end)+' '+f.end.slice(2,4):''].filter(Boolean).join(' · ')}</div></div>`).join('')}<div class="catline"><div class="h"><span class="muted">Summe pro Monat</span><b class="${cls}">${fmt(sum)}</b></div></div></div>` : `<div class="empty">${empty}</div>`; };
+      <div class="sub" style="font-size:13px;margin-left:18px">${[f.day?'am '+f.day+'.':'ohne Tag (zählt nicht im Kontostand)', f.account||'', f.end?'bis '+mLabel(f.end)+' '+f.end.slice(2,4):''].filter(Boolean).join(' · ')}</div></div>`).join('')}<div class="catline"><div class="h"><span class="muted">Summe pro Monat</span><b class="${cls}">${fmt(sum)}</b></div></div></div>` : `<div class="empty">${empty}</div>`; };
   $('#fixedin').innerHTML = list(FIXIN,'Noch keine festen Einnahmen. Zum Beispiel Gehalt als Werkstudent.','pos');
   $('#fixed').innerHTML = list(FIX,'Noch keine Fixkosten. Typisch: Miete, Handyvertrag, Fitnessstudio, Streaming, Versicherungen.','');
   document.querySelectorAll('#fixed .catline[data-id]').forEach(el=>el.onclick=()=>editFixed(el.dataset.id,'expense'));
@@ -576,6 +580,7 @@ function editDebt(id){
 
 /* ---------- Handel ---------- */
 $('#addtrade').onclick=()=>editTrade(null);
+$('#addcomm').onclick=()=>editTrade(null,'comm');
 function renderTrades(){
   const sold = TRADES.filter(t=>t.sellDate), open = TRADES.filter(t=>!t.sellDate);
   const sum = sold.reduce((a,t)=>a+tradeProfit(t),0);
@@ -584,25 +589,47 @@ function renderTrades(){
   $('#tsum').innerHTML = `<span class="${sum>=0?'pos':'neg'}">${fmt(sum)}</span>`;
   $('#tmonth').innerHTML = `<span class="${mon>=0?'pos':'neg'}">${fmt(mon)}</span>`;
   $('#tstock').textContent = fmt(stock);
-  const row = t => { const p=tradeProfit(t); return `<div class="item" data-id="${esc(t.id)}"><span class="dot" style="background:${t.sellDate?(p>=0?'var(--pos)':'var(--danger)'):'var(--muted)'}"></span><div class="t"><b>${esc(t.item||'Artikel')}</b><span>${t.sellDate?`verkauft ${dDE(t.sellDate)} für ${fmt(t.sellPrice)}`:`gekauft ${dDE(t.buyDate)} für ${fmt((+t.buyPrice||0)+(+t.buyCosts||0))}`}</span></div><div class="a ${t.sellDate?(p>=0?'pos':'neg'):''}">${t.sellDate?(p>=0?'+':'')+fmt(p):fmt(+t.buyPrice||0)}</div></div>`; };
+  const row = t => { const p=tradeProfit(t); return `<div class="item" data-id="${esc(t.id)}"><span class="dot" style="background:${t.sellDate?(p>=0?'var(--pos)':'var(--danger)'):'var(--muted)'}"></span><div class="t"><b>${esc(t.item||'Artikel')}</b><span>${t.type==='comm'?`Provision ${dDE(t.sellDate)}${t.sellAccount?' · '+esc(t.sellAccount):''}`:t.sellDate?`verkauft ${dDE(t.sellDate)} für ${fmt(t.sellPrice)}${t.sellAccount?' · '+esc(t.sellAccount):''}`:`gekauft ${dDE(t.buyDate)} für ${fmt((+t.buyPrice||0)+(+t.buyCosts||0))}${t.buyAccount?' · '+esc(t.buyAccount):''}`}</span></div><div class="a ${t.sellDate?(p>=0?'pos':'neg'):''}">${t.sellDate?(p>=0?'+':'')+fmt(p):fmt(+t.buyPrice||0)}</div></div>`; };
   $('#tradesopen').innerHTML = open.length ? open.map(row).join('') : '<div class="empty">Nichts im Lager.</div>';
   $('#tradesdone').innerHTML = sold.length ? sold.map(row).join('') : '<div class="empty">Noch nichts verkauft.</div>';
   document.querySelectorAll('#v-trade .item').forEach(el=>el.onclick=()=>editTrade(el.dataset.id));
 }
-function editTrade(id){
-  const t = id ? {...S.trades[id]} : {id:uid(),item:'',buyDate:today(),buyPrice:'',buyCosts:'',sellDate:'',sellPrice:'',fees:'',note:''};
+function editTrade(id, kind){
+  const t = id ? {...S.trades[id]} : {id:uid(),type:kind||'own',item:'',buyDate:today(),buyPrice:'',buyCosts:'',sellDate:kind==='comm'?today():'',sellPrice:'',fees:'',note:'',buyAccount:S.prefs.accOut||'Alltagskonto',sellAccount:S.prefs.accOut||'Alltagskonto'};
+  const comm = t.type==='comm';
+  const val = k => { const v=$('#'+k).value.trim(); return v?parseAmt(v):0; };
+  if(comm){
+    $('#sheet').innerHTML=`<h3>${id?'Provision bearbeiten':'Provision erfassen'}</h3>
+      <div class="sub">Jemand anderes hat gekauft und verkauft, du bekommst nur deine Provision.</div>
+      <label class="l">Artikel</label><input type="text" id="t-item" value="${esc(t.item)}" placeholder="z. B. iPad Air 5 für Max">
+      <div class="row"><div><label class="l">Provision (€)</label><input type="text" id="t-sp" inputmode="decimal" value="${esc(numIn(t.sellPrice))}"></div><div><label class="l">Datum</label><input type="date" id="t-sd" value="${esc(t.sellDate||today())}"></div></div>
+      ${accountField('t-sacc', t.sellAccount||'Alltagskonto').replace('>Konto<','>Eingegangen auf<')}
+      <label class="l">Eigene Kosten (€, optional, z. B. Versand)</label><input type="text" id="t-fe" inputmode="decimal" value="${+t.fees?esc(numIn(t.fees)):''}">
+      <label class="l">Notiz</label><input type="text" id="t-note" value="${esc(t.note||'')}">
+      <button class="btn" id="t-save">Speichern</button>${delRow(!!id)}`;
+    wireAccount('t-sacc'); wireSheet('trades',id);
+    $('#t-save').onclick=()=>{ const item=$('#t-item').value.trim(), sp=val('t-sp');
+      if(!item||!(sp>0)) return toast('Artikel und Provision angeben');
+      put('trades',{...t, type:'comm', item, buyDate:'', buyPrice:0, buyCosts:0, sellDate:$('#t-sd').value||today(), sellPrice:sp, fees:val('t-fe')||0, note:$('#t-note').value.trim(), buyAccount:'', sellAccount:readAccount('t-sacc')});
+      closeSheet(); toast('Gespeichert'); };
+    openSheet(); return;
+  }
   $('#sheet').innerHTML=`<h3>${id?esc(t.item):'Ankauf erfassen'}</h3>
     <label class="l">Artikel</label><input type="text" id="t-item" value="${esc(t.item)}" placeholder="z. B. iPad Air 5, 64 GB, blau">
     <h2 style="margin-top:16px">Ankauf</h2>
     <div class="row"><div><label class="l">Datum</label><input type="date" id="t-bd" value="${esc(t.buyDate||'')}"></div><div><label class="l">Preis (€)</label><input type="text" id="t-bp" inputmode="decimal" value="${esc(numIn(t.buyPrice))}"></div></div>
     <label class="l">Nebenkosten Ankauf (€, z. B. Versand, Fahrt)</label><input type="text" id="t-bc" inputmode="decimal" value="${esc(numIn(t.buyCosts))}">
+    ${accountField('t-bacc', t.buyAccount||'').replace('>Konto<','>Bezahlt von<')}
     <h2 style="margin-top:16px">Verkauf</h2>
     <div class="row"><div><label class="l">Datum</label><input type="date" id="t-sd" value="${esc(t.sellDate||'')}"></div><div><label class="l">Preis (€)</label><input type="text" id="t-sp" inputmode="decimal" value="${esc(numIn(t.sellPrice))}"></div></div>
     <label class="l">Provision und Gebühren (€)</label><input type="text" id="t-fe" inputmode="decimal" value="${esc(numIn(t.fees))}">
+    ${accountField('t-sacc', t.sellAccount||'').replace('>Konto<','>Geld eingegangen auf<')}
     <label class="l">Notiz</label><input type="text" id="t-note" value="${esc(t.note||'')}">
     <div class="sub" id="t-profit" style="margin-top:12px"></div>
     <button class="btn" id="t-save">Speichern</button>${delRow(!!id)}`;
-  const val = k => { const v=$('#'+k).value.trim(); return v?parseAmt(v):0; };
+  // alte Einträge ohne Konto: Feld leer lassen = kein Kontoeffekt
+  [['t-bacc',t.buyAccount],['t-sacc',t.sellAccount]].forEach(([k,v])=>{ if(!v){ $('#'+k).insertAdjacentHTML('afterbegin','<option value="">kein Konto</option>'); $('#'+k).value=''; } });
+  wireAccount('t-bacc'); wireAccount('t-sacc');
   const calc = () => { const sp=val('t-sp'); const p=sp-val('t-bp')-val('t-bc')-val('t-fe');
     $('#t-profit').innerHTML = sp ? `Gewinn: <b class="${p>=0?'pos':'neg'}">${fmt(p)}</b>` : `Eingesetzt: <b>${fmt(val('t-bp')+val('t-bc'))}</b>`; };
   ['t-bp','t-bc','t-sp','t-fe'].forEach(k=>$('#'+k).addEventListener('input',calc)); calc();
@@ -611,7 +638,7 @@ function editTrade(id){
   $('#t-save').onclick=()=>{ const item=$('#t-item').value.trim(); const bp=val('t-bp');
     if(!item||!(bp>=0)) return toast('Artikel und Ankaufpreis angeben');
     const sp=val('t-sp');
-    put('trades',{...t, item, buyDate:$('#t-bd').value||today(), buyPrice:bp, buyCosts:val('t-bc')||0, sellDate:sp?($('#t-sd').value||today()):'', sellPrice:sp||'', fees:val('t-fe')||0, note:$('#t-note').value.trim()});
+    put('trades',{...t, type:'own', item, buyDate:$('#t-bd').value||today(), buyPrice:bp, buyCosts:val('t-bc')||0, sellDate:sp?($('#t-sd').value||today()):'', sellPrice:sp||'', fees:val('t-fe')||0, note:$('#t-note').value.trim(), buyAccount:readAccount('t-bacc'), sellAccount:readAccount('t-sacc')});
     closeSheet(); toast('Gespeichert'); };
   openSheet();
 }
