@@ -139,7 +139,7 @@ label.l{display:block;font-size:13px;color:var(--muted);font-weight:600;margin:1
 .chart .c i{display:block;width:100%;max-width:46px;border-radius:6px 6px 0 0;background:var(--accent);opacity:.35}
 .chart .c.on i{opacity:1}
 .chart .c i.fx{background:var(--accent2);opacity:.3;border-radius:0}
-.chart .c.on i.fx{opacity:.6}
+.chart .c.on i.fx{opacity:.55}
 .chart .c small{font-size:11px;color:var(--muted);margin-top:6px;font-weight:600}
 .chart .c em{font-style:normal;font-size:10.5px;font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums}
 .chart .c .bars{display:flex;align-items:flex-end;gap:3px;height:100%;width:100%;justify-content:center}
@@ -190,6 +190,13 @@ label.l{display:block;font-size:13px;color:var(--muted);font-weight:600;margin:1
 .hero .split small{display:block;font-size:11px;opacity:.8;font-weight:500}
 .hero .split b{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;color:#fff}
 .hero .split b.pos{color:#a7f3d0}
+.hero .lowline{margin-top:12px;font-size:13px;background:rgba(0,0,0,.16);padding:8px 11px;border-radius:12px}
+.mine{margin-top:12px;padding:14px 18px}
+.mine .h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.mine .h span:first-child{display:flex;flex-direction:column}
+.mine small{font-size:13px;color:var(--muted);font-weight:600}
+.mine b{font-size:24px;font-weight:800;letter-spacing:-.6px;font-variant-numeric:tabular-nums;margin-top:2px}
+.mine .pill2{background:var(--accent-soft);color:var(--accent);padding:6px 11px;border-radius:10px;font-weight:700;font-size:13px;white-space:nowrap}
 .hlink{background:none;border:0;color:#fff;font:inherit;font-size:14px;font-weight:600;padding:14px 0 0;cursor:pointer;opacity:.95}
 .link{background:none;border:0;color:var(--accent);font:inherit;font-size:14px;font-weight:600;padding:10px 0 0;cursor:pointer}
 .warn .h span::before{content:'!';display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;background:rgba(245,158,11,.16);color:#f59e0b;font-weight:800;font-size:15px;flex:none}
@@ -265,7 +272,7 @@ label.l{display:block;font-size:13px;color:var(--muted);font-weight:600;margin:1
     <h2>Letzte 6 Monate</h2>
     <div class="card">
       <div class="chart" id="chart"></div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>Variabel</span><span><i style="background:var(--muted);opacity:.5"></i>Fixkosten</span><span><i style="background:var(--pos);opacity:.75"></i>Einnahmen</span></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Variabel</span><span><i style="background:var(--accent2);opacity:.55"></i>Fixkosten</span><span><i style="background:#10b981;opacity:.75"></i>Einnahmen</span></div>
     </div>
     <h2>Ausgaben nach Kategorie</h2>
     <div class="card" id="bycat"></div>

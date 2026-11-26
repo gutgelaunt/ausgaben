@@ -363,7 +363,9 @@ function debtSim(d){
 function fixedFor(m){
   const items=[];
   FIX.forEach(f=>{ if(f.active===false) return; if(f.start && m<f.start) return; if(f.end && m>f.end) return; items.push({cat:f.cat,sub:f.sub||'',name:f.name,amount:+f.amount||0}); });
-  DEBTS.forEach(d=>{ const p=SIM[d.id]&&SIM[d.id].rates[m]; if(p) items.push({cat:'schulden',sub:'Rate',name:d.name,amount:p}); });
+  DEBTS.forEach(d=>{ const s=SIM[d.id]; if(!s) return;
+    const p = m<=ym(today()) ? s.rates[m] : ((+d.rate) && !(d.rateStart && m<d.rateStart) && s.remaining>0.005 ? Math.min(+d.rate, s.remaining) : 0);
+    if(p) items.push({cat:'schulden',sub:'Rate',name:d.name,amount:p}); });
   return items;
 }
 function fixedIncomeFor(m){
@@ -501,15 +503,28 @@ function renderHome(){
   const lbl = pd.name ? `Frei bis ${esc(pd.name)} · ${dDE(pd.date).slice(0,6)}` : 'Frei bis Monatsende';
   const rows=balRows(t), now=rows.reduce((a,r)=>a+r.est,0);
   const items=bookingsBetween(t, pd.date);
-  const inSum=items.filter(x=>x.amount>0).reduce((a,x)=>a+x.amount,0), outSum=items.filter(x=>x.amount<0).reduce((a,x)=>a+x.amount,0);
-  const free=now+inSum+outSum;
+  // Hauptkonto: das Konto, über das die meisten festen Kosten und Raten laufen
+  const weight={}; [...FIX.map(f=>[f.account,+f.amount||0]), ...DEBTS.map(d=>[d.account,+d.rate||0])].forEach(([a,v])=>{ if(a) weight[a]=(weight[a]||0)+v; });
+  const MAIN = Object.keys(weight).sort((a,b)=>weight[b]-weight[a])[0] || null;
+  const isMain = a => MAIN && (a||MAIN)===MAIN; // Buchungen ohne Konto (z. B. fällige Schulden) laufen übers Hauptkonto
+  const split = MAIN && rows.some(r=>r.account===MAIN) && rows.length>1;
+  const sumOf = arr => arr.reduce((a,x)=>a+x.amount,0);
+  const mItems = split ? items.filter(x=>isMain(x.acc)) : items, pItems = split ? items.filter(x=>!isMain(x.acc)) : [];
+  const mNow = split ? rows.filter(r=>r.account===MAIN).reduce((a,r)=>a+r.est,0) : now;
+  const pNow = split ? now-mNow : 0;
+  const inSum=mItems.filter(x=>x.amount>0).reduce((a,x)=>a+x.amount,0), outSum=mItems.filter(x=>x.amount<0).reduce((a,x)=>a+x.amount,0);
+  const free=mNow+inSum+outSum, pFree=pNow+sumOf(pItems);
+  const pNames=rows.filter(r=>r.account!==MAIN).map(r=>r.account).join(' + ');
+  let low={v:mNow,d:null}, r0=mNow; mItems.forEach(x=>{ r0+=x.amount; if(r0<low.v-0.004) low={v:r0,d:x.date}; });
   let html = BALS.length ? `<div class="card hero" id="h-hero">
-      <div class="lbl">${lbl}</div>
+      <div class="lbl">${split?`${esc(MAIN)} · frei bis ${pd.name?esc(pd.name)+' ':''}${dDE(pd.date).slice(0,6)}`:lbl}</div>
       <div class="amt ${free>=0?'':'neg'}">${fmt(free)}</div>
-      <div class="per"><span class="pill">${free>=0?`${fmt(free/days)} pro Tag`:'fehlt bis dahin'}</span><span class="days">noch ${days} Tage</span></div>
-      <div class="split"><div><small>Auf Konten</small><b>${fmt(now)}</b></div><div><small>Kommt rein</small><b class="pos">+${fmt(inSum)}</b></div><div><small>Geht raus</small><b>${outSum?'−'+fmt(-outSum):fmt(0)}</b></div></div>
+      <div class="per"><span class="pill">${free<0?'fehlt bis dahin':split?'für Schulden und Extras':`${fmt(free/days)} pro Tag`}</span><span class="days">noch ${days} Tage</span></div>
+      <div class="split"><div><small>${split?'Jetzt drauf':'Auf Konten'}</small><b>${fmt(mNow)}</b></div><div><small>Kommt rein</small><b class="pos">+${fmt(inSum)}</b></div><div><small>Geht raus</small><b>${outSum?'−'+fmt(-outSum):fmt(0)}</b></div></div>
+      ${split && low.d && low.v<free-0.004 ? `<div class="lowline">Sofort überweisbar höchstens ${fmt(Math.max(0,low.v))}, tiefster Stand am ${dDE(low.d).slice(0,6)}</div>`:''}
       ${items.length?'<button class="hlink" id="h-items">Alle Buchungen bis dahin ›</button>':''}
-    </div>`
+    </div>
+    ${split?`<div class="card mine"><div class="h"><span><small>Für dich · ${esc(pNames)}</small><b class="${pFree<0?'neg':''}">${fmt(pFree)}</b></span><span class="pill2">${pFree>=0?fmt(pFree/days)+' pro Tag':'im Minus'}</span></div>${pItems.length?`<div class="sub" style="font-size:12.5px;margin-top:4px">jetzt ${fmt(pNow)}, bis dahin ${sumOf(pItems)>=0?'+':'−'}${fmt(Math.abs(sumOf(pItems)))}</div>`:''}</div>`:''}`
     : `<div class="card hero"><div class="lbl">${lbl}</div><div class="sub" style="margin-top:8px">Trag deine Kontostände und dein Bargeld ein, dann siehst du hier, was wirklich frei ist.</div><button class="btn" id="h-firstbal">Kontostand eintragen</button></div>`;
   if(rows.length){
     const accIc = a => /bar/i.test(a) ? 'M3 7h18v10H3zM12 12m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0' : 'M3 6h18v12H3zM3 10h18M7 15h3';
@@ -527,9 +542,12 @@ function renderHome(){
     <div class="catline chev"><div class="h"><span>Ausgaben</span><b>${fmt(md.total)}</b></div></div>
     <div class="catline chev"><div class="h"><span>Bilanz Monat</span><b class="${md.left>=0?'pos':'neg'}">${fmt(md.left)}</b></div></div></div>`;
   $('#home').innerHTML=html;
-  if($('#h-items')) $('#h-items').onclick=()=>{ let run=now;
-    $('#sheet').innerHTML=`<h3>Bis ${pd.name?'zum Gehalt am ':''}${dDE(pd.date).slice(0,6)}</h3><div class="sub">Start: ${fmt(now)} auf allen Konten · am Ende frei: ${fmt(free)}</div><div class="card list" style="margin-top:14px">${items.map(x=>{ run+=x.amount; return bookRow(x,run); }).join('')}</div>
-      <div class="sub" style="margin:12px 4px 0;font-size:13px">Was du ab heute zusätzlich ausgibst, ist hier noch nicht abgezogen.</div>`;
+  if($('#h-items')) $('#h-items').onclick=()=>{
+    const run={}; rows.forEach(r=>run[r.account]=r.est); const accName=x=>x.acc||MAIN||'';
+    const list=split?[...mItems,...pItems].sort((a,b)=>a.date.localeCompare(b.date)):items;
+    let all=now;
+    $('#sheet').innerHTML=`<h3>Bis ${pd.name?'zum Gehalt am ':''}${dDE(pd.date).slice(0,6)}</h3><div class="sub">${split?`${esc(MAIN)}: jetzt ${fmt(mNow)}, am Ende frei ${fmt(free)}`:`Start: ${fmt(now)} auf allen Konten · am Ende frei: ${fmt(free)}`}</div><div class="card list" style="margin-top:14px">${list.map(x=>{ const a=accName(x); if(split){ run[a]=(run[a]||0)+x.amount; return bookRow({...x,acc:a},run[a]); } all+=x.amount; return bookRow(x,all); }).join('')}</div>
+      <div class="sub" style="margin:12px 4px 0;font-size:13px">${split?'„danach“ zeigt den Stand des Kontos, von dem die Buchung abgeht. ':''}Was du ab heute zusätzlich ausgibst, ist hier noch nicht abgezogen.</div>`;
     openSheet(); };
   if($('#h-more')) $('#h-more').onclick=()=>goFin('acc');
   if($('#h-firstbal')) $('#h-firstbal').onclick=()=>editBalance();
